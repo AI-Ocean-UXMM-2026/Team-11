@@ -1,0 +1,185 @@
+.driver-job-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 20px;
+  text-align: left;
+  border-top: 1px solid var(--border);
+}
+.icon-button.sidebar-close {
+  display: none;
+}
+@media (max-width: 700px) {
+  .icon-button.sidebar-close {
+    display: flex;
+    position: absolute;
+    top: 17px;
+    right: 9px;
+  }
+  .sidebar .brand {
+    font-size: 19px;
+    letter-spacing: -0.8px;
+  }
+  .sidebar .brand-mark {
+    width: 30px;
+    height: 30px;
+    margin-right: 7px;
+  }
+}
+.driver-job-row > span:nth-child(2) {
+  flex: 1;
+}
+.driver-job-row strong {
+  font-size: 13px;
+  display: block;
+}
+.driver-job-row small {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.subtitle,
+.greeting,
+.stat-top,
+.stat-bottom,
+.workspace-footer,
+.nav-caption,
+.demo-label,
+.business-cell small,
+.branch-row div > span,
+.action-row small,
+.table-footer,
+.panel-note,
+.product-info > p,
+.product-category,
+.location-content > p,
+.location-stats small,
+.sale-row small {
+  color: #697563;
+}
+.hero-copy p {
+  color: #c2d5c3;
+}
+.network-note p {
+  color: #65765b;
+}
+.stat-indicator {
+  background: #77935d;
+}
+.nav-item {
+  min-height: 45px;
+}
+.text-link {
+  min-height: 26px;
+}
+.business-cell {
+  min-height: 36px;
+}
+.profile small {
+  line-height: 1.6;
+}
+.topbar-tools {
+  min-width: 0;
+}
+.workspace-footer {
+  flex-wrap: wrap;
+}
+.nav-item > span:not(.nav-count) {
+  min-width: 0;
+}
+.business-cell strong {
+  white-space: normal;
+  min-width: 120px;
+}
+.badge {
+  max-width: 100%;
+}
+@media (max-height: 780px) and (min-width: 701px) {
+  .network-note {
+    display: none;
+  }
+  .sidebar-bottom {
+    padding-top: 20px;
+  }
+  .workspace-switch {
+    margin-top: 25px;
+    margin-bottom: 22px;
+  }
+  .profile {
+    padding-top: 15px;
+    padding-bottom: 15px;
+  }
+}
+@media (max-width: 480px) {
+  .field input,
+  .field textarea,
+  .field select,
+  .search-field input,
+  .select-field select,
+  .report-filters input,
+  .report-filters select {
+    font-size: 16px;
+  }
+  .button {
+    min-height: 44px;
+  }
+  .icon-button {
+    width: 40px;
+    min-height: 40px;
+  }
+  .table-tabs button {
+    min-height: 40px;
+    padding-top: 5px;
+  }
+  .nav-item {
+    min-height: 46px;
+  }
+  .product-bottom {
+    gap: 6px;
+  }
+  .driver-job-row {
+    flex-wrap: wrap;
+  }
+  .driver-job-row > .badge {
+    margin-left: 46px;
+  }
+  .table-tabs {
+    gap: 14px;
+  }
+  .table-tabs button {
+    font-size: 11px;
+  }
+  .stat-value {
+    font-size: 28px;
+  }
+  .stat-value small {
+    font-size: 10px;
+  }
+  .stat-bottom {
+    font-size: 10px;
+  }
+  .hero-copy p {
+    font-size: 12px;
+    max-width: 230px;
+  }
+  .hero-copy h2 {
+    font-size: 24px;
+  }
+  .hero-kicker {
+    font-size: 11px;
+  }
+  .hero-link {
+    font-size: 12px;
+  }
+  .network-hero {
+    min-height: 260px;
+  }
+  .subtitle {
+    font-size: 12px;
+  }
+  .page-heading h1 {
+    font-size: 26px;
+  }
+}
