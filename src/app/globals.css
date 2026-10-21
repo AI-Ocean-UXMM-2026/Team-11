@@ -1,5 +1,6 @@
 @import "../styles/workspace.css";
 @import "../styles/workflow.css";
+@import "../styles/branches.css";
 
 :root {
   --forest: #17493d;

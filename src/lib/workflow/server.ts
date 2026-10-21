@@ -4,7 +4,7 @@ import { getDemoSession } from "../auth/session";
 import { isDemoMode } from "../supabase/config";
 import { createClient } from "../supabase/server";
 import { localRequest, localIdentity } from "./local";
-import type { Viewer, WorkspaceData } from "../domain";
+import type { Role, Viewer, WorkspaceData } from "../domain";
 
 export class WorkflowError extends Error {
   constructor(
@@ -14,19 +14,37 @@ export class WorkflowError extends Error {
     super(message);
   }
 }
+export class PasswordChangeRequired extends WorkflowError {
+  constructor(public role: Role) {
+    super("Complete your first-login password change before continuing.", 403);
+  }
+}
 export async function workflowActor(): Promise<Viewer> {
   if (isDemoMode()) {
     const user = await getDemoSession();
-    if (!user || user.mustChangePassword)
+    if (!user)
       throw new WorkflowError(
         "Sign in and complete your password change.",
         401,
       );
+    if (user.mustChangePassword) throw new PasswordChangeRequired(user.role);
+    const profile = await localRequest(
+      user.id,
+      async (tx) =>
+        (
+          await tx.query<{ status: string; branch_id: string | null }>(
+            "select status,branch_id from public.profiles where id=auth.uid()",
+          )
+        ).rows[0],
+    );
+    if (!profile || profile.status !== "active")
+      throw new WorkflowError("This account or branch is inactive.", 403);
     return {
       id: user.id,
       name: user.name,
       role: user.role,
       authenticated: true,
+      branchId: profile.branch_id,
     };
   }
   const db = await createClient();
@@ -39,11 +57,12 @@ export async function workflowActor(): Promise<Viewer> {
     .select("id,name,role,branch_id,status,must_change_password")
     .eq("id", user.id)
     .single();
-  if (error || !p || p.status !== "active" || p.must_change_password)
+  if (error || !p || p.status !== "active")
     throw new WorkflowError(
       "An active account with completed setup is required.",
       403,
     );
+  if (p.must_change_password) throw new PasswordChangeRequired(p.role);
   return {
     id: p.id,
     name: p.name,

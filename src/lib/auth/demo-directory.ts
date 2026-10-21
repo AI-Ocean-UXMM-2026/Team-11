@@ -62,7 +62,7 @@ export class DemoDirectory {
   }
   listAccounts(): Account[] {
     return [...this.users.values()]
-      .filter((u) => u.role === "sme" || u.role === "driver")
+      .filter((u) => u.role !== "hq")
       .map((u) => ({
         id: u.id,
         name: u.name,
@@ -70,6 +70,7 @@ export class DemoDirectory {
         role: u.role,
         status: u.status,
         affiliation: u.affiliation,
+        branchId: u.branchId,
       }));
   }
   workflowUsers(): DemoUser[] {
@@ -166,6 +167,7 @@ export class DemoDirectory {
         status: "Active",
         affiliation: v.address,
         phone: v.phone,
+        branchId: v.branchId || null,
         mustChangePassword: true,
       },
       v.password,

@@ -1,6 +1,6 @@
 # Connect Supabase
 
-Phase 2 adds the saved ordering and delivery workflow. Local orders and stock use a private PGlite database in `.data/`; demo accounts and sessions remain in server memory. See [the workflow guide](order-workflow.md). A hosted Supabase project is not configured yet.
+Phase 2 adds the saved ordering and delivery workflow. Local orders and stock use a private PGlite database in `.data/`; demo accounts and sessions remain in server memory. See [the workflow guide](order-workflow.md). The Supply Link hosted project is now connected; see [deployment status and first HQ login](live-supabase.md).
 
 ## 1. Environment
 
@@ -19,10 +19,10 @@ To host an intentional demo, explicitly set `NEXT_PUBLIC_DEMO_MODE=true`.
 
 ## 2. Database
 
-Apply `supabase/migrations/202610200001_baseline.sql` followed by `202610200002_stt_catalog.sql` then `202610210003_order_workflow.sql` and `202610210004_order_history.sql` in a fresh Supabase SQL editor,
+Apply `supabase/migrations/202610200001_baseline.sql` followed by `202610200002_stt_catalog.sql`, `202610210003_order_workflow.sql`, `202610210004_order_history.sql` and `20261021045326_branch_operations.sql` in a fresh Supabase SQL editor,
 or apply it with your usual Supabase CLI migration workflow. Optional `supabase/seed.sql`
 adds sample branches, not user accounts. Branch stock starts empty on hosted Supabase; HQ must enter actual counts. Configure shipping and receiving-account instructions in HQ Settings before creating orders. Disable **Allow new users to sign up**
-in Supabase Authentication settings. All SME and Driver provisioning must go through HQ.
+in Supabase Authentication settings. All SME, Driver and Branch staff provisioning must go through HQ. Apply migrations before exposing the matching application UI.
 
 Tables have RLS enabled and authenticated users have SELECT grants only. Policy helpers read
 the server-managed profile and reject suspended or first-login accounts from operational data.
@@ -43,11 +43,10 @@ values ('AUTH_USER_UUID', 'your.username', 'Your name', 'hq', true);
 
 Restart the app. Sign in using `your.username` and that temporary password, then complete the
 first-login password change. For production, rebuild after changing public environment values.
-From **SMEs & drivers**, HQ can provision real SME/Driver accounts.
+From **Accounts & access**, HQ can provision real SME, Driver and Branch staff accounts.
 SMEs use `/sme/login`; Drivers use `/driver/login`; HQ uses `/hq/login`. Their matching login
 API endpoints verify the profile role and account status before accepting the session.
-SMEs and Drivers never select a role on sign-in. For the baseline, create branch staff using
-the same trusted admin bootstrap path with role `branch` and an existing `branch_id`, then use `/branch/login`.
+SMEs and Drivers never select a role on sign-in. Create locations in HQ **Branches**, then issue branch staff credentials linked to the location from **Accounts & access**. Branch staff use `/branch/login`. Drivers can be linked to HQ or an open branch and only fulfil that location's deliveries.
 
 Supabase Auth must enforce rate limits. Contact HQ for resets; there is no public signup or
 email-reset flow because these account IDs do not use deliverable email addresses.
@@ -66,9 +65,9 @@ The `workflow_execute` RPC validates ownership, role, first-login state and stat
 
 ## Remaining implementation slices
 
-1. Hosted Supabase smoke test with real Auth/Storage; schema/RPC/RLS and storage advisor review.
+1. Production deployment and Auth configuration review; hosted Auth/Storage and transaction checks are recorded in [live connection verification](live-supabase.md).
 2. Returns/reversals, physical return acceptance, refund accounting, and paginated history/reporting.
-3. Opt-in foreground GPS publishing, freshness/retention controls and branch replacement transactions.
+3. Opt-in foreground GPS publishing and freshness/retention controls. Branch replacement transactions are implemented; see [branch operations](branch-operations.md).
 4. HQ reset/suspension, session revocation and account creation reconciliation.
 
 No real payment, refund or location collection is performed by the app. Do not use local demo credentials for hosted operations.

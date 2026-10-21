@@ -12,8 +12,15 @@ const users = {
   driver: randomUUID(),
   outsider: randomUUID(),
   branch: randomUUID(),
+  branchother: randomUUID(),
+  branchdriver: randomUUID(),
+  otherdriver: randomUUID(),
 };
-let product: string, branch: string, order: string, evidence: string;
+let product: string,
+  branch: string,
+  otherBranch: string,
+  order: string,
+  evidence: string;
 async function rpc(
   role: keyof typeof users,
   action: string,
@@ -53,6 +60,7 @@ beforeAll(async () => {
     "202610200002_stt_catalog.sql",
     "202610210003_order_workflow.sql",
     "202610210004_order_history.sql",
+    "20261021045326_branch_operations.sql",
   ])
     await db.exec(await readFile(`supabase/migrations/${name}`, "utf8"));
   await db.exec(await readFile("supabase/seed.sql", "utf8"));
@@ -64,21 +72,31 @@ beforeAll(async () => {
       "select id from public.products where brand='STT' limit 1",
     )
   ).rows[0].id;
+  otherBranch = (
+    await db.query<{ id: string }>(
+      "select id from public.branches where id<>$1 limit 1",
+      [branch],
+    )
+  ).rows[0].id;
   for (const [name, id] of Object.entries(users)) {
     await db.query("insert into auth.users(id) values($1)", [id]);
     await db.query(
       "insert into public.profiles(id,username,name,role,must_change_password,branch_id) values($1,$2,$2,$3,false,$4)",
       [
         id,
-        `${name}.user`,
+        `${name.toLowerCase()}.user`,
         name === "hq"
           ? "hq"
-          : name === "driver" || name === "outsider"
+          : name.includes("driver") || name === "outsider"
             ? "driver"
-            : name === "branch"
+            : name.startsWith("branch")
               ? "branch"
               : "sme",
-        name === "branch" ? branch : null,
+        name === "branch" || name === "branchdriver"
+          ? branch
+          : name === "branchother" || name === "otherdriver"
+            ? otherBranch
+            : null,
       ],
     );
   }
@@ -401,4 +419,242 @@ it("allocates competing paid orders atomically and releases reservations on canc
       reason: "Unauthorized driver hold",
     }),
   ).rejects.toThrow("not available");
+});
+
+it("lets only HQ create branches and scopes each branch to its own drivers", async () => {
+  await expect(
+    rpc("branch", "branch_create", {
+      name: "New location",
+      address: "Yangon test address",
+    }),
+  ).rejects.toThrow("Only HQ");
+  const result = await rpc("hq", "branch_create", {
+    name: "New location",
+    address: "Yangon test address",
+    manager: "Manager",
+  });
+  const state = await snapshot("hq");
+  expect(state.branches.find((b) => b.id === result.branchId)!.stock).toBe(0);
+  const own = await snapshot("branch");
+  expect(own.branches).toHaveLength(1);
+  expect(own.branches[0].id).toBe(branch);
+  expect(own.accounts.map((a) => a.id)).toEqual([users.branchdriver]);
+  await expect(
+    rpc("branch", "driver_affiliation", {
+      driverId: users.otherdriver,
+      branchId: branch,
+      reason: "Unauthorized transfer",
+    }),
+  ).rejects.toThrow("HQ");
+});
+
+it("requires dispatch and destination receipt for reserve-aware, retry-safe refills", async () => {
+  await rpc("hq", "stock", {
+    productId: product,
+    onHand: 30,
+    reason: "Physical count for branch testing",
+  });
+  await db.query(
+    "update public.inventory set on_hand=0,protected_reserve=0,allocated=0 where branch_id=$1 and product_id=$2",
+    [branch, product],
+  );
+  const payload = {
+    productId: product,
+    quantity: 10,
+    destinationBranchId: branch,
+    sourceBranchId: "",
+    reason: "Refill Hlaing",
+  };
+  const key = randomUUID();
+  const transfer = await rpc("hq", "transfer_create", payload, key);
+  expect((await rpc("hq", "transfer_create", payload, key)).transferId).toBe(
+    transfer.transferId,
+  );
+  await expect(
+    rpc("branchother", "transfer_dispatch", {
+      transferId: transfer.transferId,
+      confirmed: true,
+    }),
+  ).rejects.toThrow("source");
+  await rpc("hq", "transfer_dispatch", {
+    transferId: transfer.transferId,
+    confirmed: true,
+  });
+  expect(
+    (await snapshot("branch")).products.find((p) => p.id === product)!.stock,
+  ).toBe(0);
+  await expect(
+    rpc("branchother", "transfer_receive", {
+      transferId: transfer.transferId,
+      confirmed: true,
+    }),
+  ).rejects.toThrow("destination");
+  const receipt = randomUUID();
+  await rpc(
+    "branch",
+    "transfer_receive",
+    { transferId: transfer.transferId, confirmed: true },
+    receipt,
+  );
+  await rpc(
+    "branch",
+    "transfer_receive",
+    { transferId: transfer.transferId, confirmed: true },
+    receipt,
+  );
+  expect(
+    (await snapshot("branch")).products.find((p) => p.id === product)!.stock,
+  ).toBe(10);
+  expect((await snapshot("hq")).salesEvents).toHaveLength(2);
+});
+
+it("reconciles the original shipment before a branch accepts and dispatches its own driver", async () => {
+  const id = (await rpc("sme", "create", quote())).orderId;
+  const proof = await rpc("sme", "proof_intent", {
+    orderId: id,
+    digest: "d".repeat(64),
+  });
+  await db.query(
+    "insert into storage.objects(bucket_id,name) values('payment-evidence',$1)",
+    [proof.path],
+  );
+  await rpc("sme", "submit_evidence", {
+    orderId: id,
+    intentId: proof.intentId,
+    amount: 95000,
+    reference: "BRANCH-BACKUP",
+  });
+  const e = (await snapshot("hq")).orders.find((o) => o.id === id)!.workflow!
+    .evidence[0];
+  await rpc("hq", "review_payment", {
+    orderId: id,
+    evidenceId: e.id,
+    decision: "approve",
+    verifiedAmount: 95000,
+    bankChecked: true,
+  });
+  await expect(
+    rpc("hq", "assign", { orderId: id, driverId: users.branchdriver }),
+  ).rejects.toThrow("fulfilment location");
+  await rpc("hq", "assign", { orderId: id, driverId: users.driver });
+  await rpc("hq", "prepare", { orderId: id });
+  await rpc("hq", "dispatch", { orderId: id });
+  await rpc("hq", "hold", { orderId: id, reason: "HQ vehicle failed" });
+  await expect(
+    rpc("hq", "route_branch", {
+      orderId: id,
+      branchId: branch,
+      reason: "Branch backup needed",
+    }),
+  ).rejects.toThrow("original consignment");
+  await rpc("hq", "route_branch", {
+    orderId: id,
+    branchId: branch,
+    reason: "Original goods physically returned, Hlaing takes over",
+    originalResolution: "returned_to_hq",
+    consignmentResolved: true,
+    receivedBack: true,
+  });
+  const h = (await snapshot("branch")).orders.find((o) => o.id === id)!
+    .workflow!.handoffs![0];
+  await expect(
+    rpc("branchother", "handoff_accept", { orderId: id, handoffId: h.id }),
+  ).rejects.toThrow("selected branch");
+  await expect(
+    rpc("hq", "resolve", { orderId: id, reason: "Try to bypass acceptance" }),
+  ).rejects.toThrow("handoff");
+  const acceptance = randomUUID();
+  await rpc(
+    "branch",
+    "handoff_accept",
+    { orderId: id, handoffId: h.id },
+    acceptance,
+  );
+  await rpc(
+    "branch",
+    "handoff_accept",
+    { orderId: id, handoffId: h.id },
+    acceptance,
+  );
+  const scoped = (await snapshot("branch")).orders.find((o) => o.id === id)!;
+  expect(scoped.merchandise).toBe(0);
+  expect(scoped.workflow!.evidence).toHaveLength(0);
+  expect(scoped.workflow!.sourceBranchId).toBe(branch);
+  await expect(
+    rpc("branch", "assign", { orderId: id, driverId: users.driver }),
+  ).rejects.toThrow("fulfilment location");
+  await rpc("branch", "assign", { orderId: id, driverId: users.branchdriver });
+  await expect(
+    rpc("hq", "driver_affiliation", {
+      driverId: users.branchdriver,
+      branchId: "",
+      reason: "Move during active job",
+    }),
+  ).rejects.toThrow("active driver");
+  await rpc("branch", "prepare", { orderId: id });
+  const dispatch = randomUUID();
+  await rpc("branch", "dispatch", { orderId: id }, dispatch);
+  await rpc("branch", "dispatch", { orderId: id }, dispatch);
+  expect((await snapshot("driver")).orders.some((o) => o.id === id)).toBe(
+    false,
+  );
+  await rpc("branchdriver", "handover", { orderId: id });
+  await rpc("sme", "receive", { orderId: id, fullReceipt: true });
+  await rpc("hq", "complete", { orderId: id });
+  expect(
+    (await snapshot("hq")).salesEvents!.filter((e) => e.orderId === id),
+  ).toHaveLength(1);
+  expect(
+    (await snapshot("branch")).products.find((p) => p.id === product)!.stock,
+  ).toBe(8);
+});
+
+it("returns branch stock before closure and blocks closed branch accounts", async () => {
+  await expect(
+    rpc("hq", "branch_close", {
+      branchId: branch,
+      reason: "Location is closing",
+    }),
+  ).rejects.toThrow("Return remaining");
+  const transfer = await rpc("hq", "transfer_create", {
+    productId: product,
+    quantity: 8,
+    sourceBranchId: branch,
+    destinationBranchId: "",
+    reason: "Return all closing stock",
+  });
+  await rpc("branch", "transfer_dispatch", {
+    transferId: transfer.transferId,
+    confirmed: true,
+  });
+  await expect(
+    rpc("hq", "branch_close", {
+      branchId: branch,
+      reason: "Location is closing",
+    }),
+  ).rejects.toThrow("stock transfers");
+  await rpc("hq", "transfer_receive", {
+    transferId: transfer.transferId,
+    confirmed: true,
+  });
+  await rpc("hq", "branch_close", {
+    branchId: branch,
+    reason: "Premises permanently closed",
+  });
+  const state = await snapshot("hq");
+  expect(state.branches.find((b) => b.id === branch)!.active).toBe(false);
+  expect(state.accounts.find((a) => a.id === users.branchdriver)!.status).toBe(
+    "Suspended",
+  );
+  await expect(snapshot("branch")).rejects.toThrow("active signed-in");
+  await expect(
+    rpc("branchdriver", "handover", { orderId: order }),
+  ).rejects.toThrow("active account");
+  await expect(
+    rpc("hq", "driver_affiliation", {
+      driverId: users.driver,
+      branchId: branch,
+      reason: "Invalid closed assignment",
+    }),
+  ).rejects.toThrow("open branch");
 });

@@ -44,6 +44,7 @@ async function initialize() {
     "202610200002_stt_catalog.sql",
     "202610210003_order_workflow.sql",
     "202610210004_order_history.sql",
+    "20261021045326_branch_operations.sql",
   ]) {
     const done = await db.query(
       "select 1 from public.workflow_migrations where name=$1",
@@ -95,23 +96,43 @@ export async function localRequest<T>(
         );
         for (const user of users) {
           const id = localIdentity(user.id);
+          const existing = await tx.query<{
+            status: string;
+            branch_id: string | null;
+          }>("select status,branch_id from public.profiles where id=$1", [id]);
+          const affiliation =
+            existing.rows[0]?.branch_id ??
+            user.branchId ??
+            (user.role === "branch" ? branch.rows[0].id : null);
+          const open = affiliation
+            ? await tx.query(
+                "select 1 from public.branches where id=$1 and active",
+                [affiliation],
+              )
+            : null;
+          const status =
+            user.status !== "Active" ||
+            existing.rows[0]?.status === "suspended" ||
+            (open && !open.rows.length)
+              ? "suspended"
+              : "active";
           await tx.query(
             "insert into auth.users(id) values($1) on conflict do nothing",
             [id],
           );
           await tx.query(
             `insert into public.profiles(id,username,name,role,status,must_change_password,phone,address,branch_id)
-          values($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict(id) do update set status=excluded.status,must_change_password=excluded.must_change_password`,
+          values($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict(id) do update set status=case when excluded.status='suspended' then excluded.status else public.profiles.status end,must_change_password=excluded.must_change_password`,
             [
               id,
               user.username,
               user.name,
               user.role,
-              user.status === "Active" ? "active" : "suspended",
+              status,
               user.mustChangePassword,
               user.phone,
               user.affiliation,
-              user.role === "branch" ? branch.rows[0].id : null,
+              affiliation,
             ],
           );
         }

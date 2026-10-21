@@ -6,6 +6,7 @@ import { loginEmail, type Role } from "../domain";
 import { loginSchema, portalHome, type LoginPortal } from "../portals";
 import { demoDirectory } from "./demo-directory";
 import { DEMO_COOKIE } from "./session";
+import { localRequest } from "../workflow/local";
 
 export async function authenticatePortal(
   portal: LoginPortal,
@@ -22,6 +23,22 @@ export async function authenticatePortal(
     const result = demoDirectory().authenticate(portal, username, password);
     if (result.error || !result.token || !result.user)
       return { status: result.status, error: result.error };
+    const active = await localRequest(
+      result.user.id,
+      async (tx) =>
+        (
+          await tx.query<{ status: string }>(
+            "select status from public.profiles where id=auth.uid()",
+          )
+        ).rows[0]?.status === "active",
+    );
+    if (!active) {
+      demoDirectory().signOut(result.token);
+      return {
+        status: 403,
+        error: "This account or branch is inactive. Contact HQ.",
+      };
+    }
     const jar = await cookies();
     const previous = jar.get(DEMO_COOKIE)?.value;
     demoDirectory().signOut(previous);

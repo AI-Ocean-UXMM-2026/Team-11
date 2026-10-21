@@ -56,6 +56,7 @@ import {
 import { provisionAccount, signOut } from "@/app/actions";
 import { workflowAction, refreshWorkspace } from "@/app/workflow-actions";
 import { OrderWorkflow } from "./order-workflow";
+import { BranchNetwork, StockTransfers } from "./branch-network";
 import { WorkflowAdmin } from "./workflow-admin";
 import { NetworkArt } from "./network-art";
 import { ShoeCatalog } from "./shoe-catalog";
@@ -68,7 +69,7 @@ const navigations: Record<Role, Nav[]> = {
     { key: "orders", label: "Wholesale orders", icon: ClipboardList },
     { key: "inventory", label: "Shoes & stock", icon: Package },
     { key: "branches", label: "Branches", icon: Store },
-    { key: "accounts", label: "SMEs & drivers", icon: Users },
+    { key: "accounts", label: "Accounts & access", icon: Users },
     { key: "reports", label: "Reports", icon: Wallet },
   ],
   sme: [
@@ -79,6 +80,7 @@ const navigations: Record<Role, Nav[]> = {
   ],
   branch: [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
+    { key: "deliveries", label: "Branch deliveries", icon: Truck },
     { key: "sales", label: "Retail sales", icon: ShoppingBag },
     { key: "inventory", label: "Branch stock", icon: Package },
     { key: "reports", label: "Sales reports", icon: Wallet },
@@ -93,7 +95,7 @@ const sectionTitles: Record<string, string> = {
   orders: "Wholesale orders",
   inventory: "Shoes & stock",
   branches: "Your branch network",
-  accounts: "SMEs & drivers",
+  accounts: "Accounts & access",
   reports: "Sales & operations",
   settings: "Workspace settings",
   catalog: "STT shoe catalog",
@@ -195,8 +197,11 @@ export function Workspace({
   const [issuedCredentials, setIssuedCredentials] = useState<{
     username: string;
     password: string;
-    role: "sme" | "driver";
+    role: "sme" | "driver" | "branch";
   } | null>(null);
+  const [accountRole, setAccountRole] = useState<"sme" | "driver" | "branch">(
+    "sme",
+  );
   const [mobileNav, setMobileNav] = useState(false);
   const [narrow, setNarrow] = useState(false);
   const navRef = useRef<HTMLElement>(null);
@@ -415,7 +420,7 @@ export function Workspace({
       username: String(form.get("username") ?? "")
         .trim()
         .toLowerCase(),
-      role: String(form.get("role")) as "sme" | "driver",
+      role: String(form.get("role")) as "sme" | "driver" | "branch",
       password: String(form.get("password") ?? ""),
       phone: String(form.get("phone") ?? ""),
       address: String(form.get("address") ?? ""),
@@ -432,7 +437,8 @@ export function Workspace({
         name: input.name,
         username: input.username,
         role: input.role,
-        status: "Active",
+        status: "Pending setup",
+        branchId: input.branchId || null,
         affiliation: input.address,
       };
       update({ ...data, accounts: [account, ...data.accounts] });
@@ -549,31 +555,33 @@ export function Workspace({
           View all <Icon icon={ArrowUpRight} size={15} />
         </Link>
       </div>
-      {data.branches.map((b) => (
-        <div className="branch-row" key={b.id}>
-          <span className="branch-icon">
-            <Icon icon={Store} size={20} />
-          </span>
-          <div>
-            <strong>{b.name}</strong>
-            <span>
-              {role === "hq"
-                ? `${money(data.retailSales.filter((s) => s.branchId === b.id).reduce((s, x) => s + x.amount, 0))} MMK in retail sales`
-                : b.address}
+      {data.branches
+        .filter((b) => b.active !== false)
+        .map((b) => (
+          <div className="branch-row" key={b.id}>
+            <span className="branch-icon">
+              <Icon icon={Store} size={20} />
             </span>
+            <div>
+              <strong>{b.name}</strong>
+              <span>
+                {role === "hq"
+                  ? `${money(data.retailSales.filter((s) => s.branchId === b.id).reduce((s, x) => s + x.amount, 0))} MMK in retail sales`
+                  : b.address}
+              </span>
+            </div>
+            {role === "hq" && (
+              <span
+                className={`health-dot ${b.lowStock ? "warning" : ""}`}
+                title={
+                  b.lowStock
+                    ? `${b.lowStock} low-stock products`
+                    : "Healthy stock"
+                }
+              />
+            )}
           </div>
-          {role === "hq" && (
-            <span
-              className={`health-dot ${b.lowStock ? "warning" : ""}`}
-              title={
-                b.lowStock
-                  ? `${b.lowStock} low-stock products`
-                  : "Healthy stock"
-              }
-            />
-          )}
-        </div>
-      ))}
+        ))}
       <div className="panel-note">
         <Icon icon={ShieldCheck} size={16} />
         <span>
@@ -631,7 +639,7 @@ export function Workspace({
                 : role === "sme"
                   ? viewer.name
                   : role === "branch"
-                    ? "Hlaing branch"
+                    ? (data.branches[0]?.name ?? "Branch workspace")
                     : "Yangon deliveries"}
             </strong>
             <small>{roleNames[role]}</small>
@@ -965,7 +973,10 @@ export function Workspace({
                       },
                       {
                         label: "Active branches",
-                        value: String(data.branches.length).padStart(2, "0"),
+                        value: String(
+                          data.branches.filter((b) => b.active !== false)
+                            .length,
+                        ).padStart(2, "0"),
                         unit: "branches",
                         note: "Working together across Yangon",
                         icon: Store,
@@ -1362,6 +1373,16 @@ export function Workspace({
             </section>
           )}
 
+          {section === "inventory" && role === "branch" && (
+            <StockTransfers
+              data={data}
+              viewer={viewer}
+              updated={applySnapshot}
+            />
+          )}
+          {section === "branches" && role === "hq" && (
+            <BranchNetwork data={data} updated={applySnapshot} />
+          )}
           {(section === "catalog" || section === "inventory") && (
             <>
               <div className="catalog-tools">
@@ -1462,53 +1483,58 @@ export function Workspace({
             </>
           )}
 
-          {(section === "branches" || section === "locations") && (
+          {((section === "branches" && role !== "hq") ||
+            section === "locations") && (
             <div className="branch-grid">
-              {data.branches.map((b) => (
-                <section key={b.id} className="panel location-card">
-                  <div className="location-art">
-                    <Store size={48} strokeWidth={1.2} />
-                    <span>SupplyLink local</span>
-                  </div>
-                  <div className="location-content">
-                    <div className="heading-inline">
-                      <h2>{b.name}</h2>
-                      {demo && (
-                        <Badge status={b.lowStock ? "Low stock" : "Healthy"} />
+              {data.branches
+                .filter((b) => b.active !== false)
+                .map((b) => (
+                  <section key={b.id} className="panel location-card">
+                    <div className="location-art">
+                      <Store size={48} strokeWidth={1.2} />
+                      <span>SupplyLink local</span>
+                    </div>
+                    <div className="location-content">
+                      <div className="heading-inline">
+                        <h2>{b.name}</h2>
+                        {demo && (
+                          <Badge
+                            status={b.lowStock ? "Low stock" : "Healthy"}
+                          />
+                        )}
+                      </div>
+                      <p>
+                        <MapPin size={16} />
+                        {b.address}
+                      </p>
+                      <p>
+                        <Users size={16} />
+                        Managed by {b.manager || "Branch team"}
+                      </p>
+                      {role === "hq" && (
+                        <div className="location-stats">
+                          <span>
+                            <small>Retail sales</small>
+                            <strong>
+                              {money(
+                                data.retailSales
+                                  .filter((s) => s.branchId === b.id)
+                                  .reduce((sum, s) => sum + s.amount, 0),
+                              )}{" "}
+                              <em>MMK</em>
+                            </strong>
+                          </span>
+                          <span>
+                            <small>Stock on hand</small>
+                            <strong>
+                              {b.stock} <em>pairs</em>
+                            </strong>
+                          </span>
+                        </div>
                       )}
                     </div>
-                    <p>
-                      <MapPin size={16} />
-                      {b.address}
-                    </p>
-                    <p>
-                      <Users size={16} />
-                      Managed by {b.manager || "Branch team"}
-                    </p>
-                    {role === "hq" && (
-                      <div className="location-stats">
-                        <span>
-                          <small>Retail sales</small>
-                          <strong>
-                            {money(
-                              data.retailSales
-                                .filter((s) => s.branchId === b.id)
-                                .reduce((sum, s) => sum + s.amount, 0),
-                            )}{" "}
-                            <em>MMK</em>
-                          </strong>
-                        </span>
-                        <span>
-                          <small>Stock on hand</small>
-                          <strong>
-                            {b.stock} <em>pairs</em>
-                          </strong>
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </section>
-              ))}
+                  </section>
+                ))}
             </div>
           )}
 
@@ -1796,14 +1822,16 @@ export function Workspace({
                       </span>
                     </div>
                   </div>
-                  <div className="gps-placeholder">
-                    <MapPin size={21} />
-                    <strong>Location sharing is not connected yet</strong>
-                    <p>
-                      No live location is being collected. Use manual updates
-                      with HQ for this baseline.
-                    </p>
-                  </div>
+                  {role === "driver" && (
+                    <div className="gps-placeholder">
+                      <MapPin size={21} />
+                      <strong>Location sharing is not connected yet</strong>
+                      <p>
+                        No live location is being collected. Use manual updates
+                        with HQ for this baseline.
+                      </p>
+                    </div>
+                  )}
                   <button
                     className="button secondary full-width"
                     onClick={() => setSelected(o)}
@@ -1935,10 +1963,7 @@ export function Workspace({
       )}
 
       {modal === "account" && (
-        <Modal
-          title="Create an SME or driver account"
-          close={() => setModal(null)}
-        >
+        <Modal title="Issue a portal login" close={() => setModal(null)}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -1964,9 +1989,16 @@ export function Workspace({
             <div className="form-grid">
               <label className="field">
                 Role
-                <select name="role">
+                <select
+                  name="role"
+                  value={accountRole}
+                  onChange={(e) =>
+                    setAccountRole(e.target.value as typeof accountRole)
+                  }
+                >
                   <option value="sme">SME business</option>
                   <option value="driver">Delivery driver</option>
+                  <option value="branch">Branch staff</option>
                 </select>
               </label>
               <label className="field">
@@ -2003,18 +2035,30 @@ export function Workspace({
                 />
               </label>
             </div>
-            {!demo && (
+            {accountRole !== "sme" && (
               <label className="field">
-                Driver affiliation
-                <select name="branchId">
-                  <option value="">STT Yangon headquarters</option>
-                  {data.branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
+                {accountRole === "branch"
+                  ? "Branch for this staff account"
+                  : "Driver assigned location"}
+                <select name="branchId" required={accountRole === "branch"}>
+                  <option value="">
+                    {accountRole === "branch"
+                      ? "Choose an open branch"
+                      : "STT Yangon HQ"}
+                  </option>
+                  {data.branches
+                    .filter((b) => b.active !== false)
+                    .map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
                 </select>
-                <small>Applies only to driver accounts.</small>
+                <small>
+                  {accountRole === "branch"
+                    ? "This login can access only the selected branch."
+                    : "HQ drivers serve HQ; branch drivers serve their assigned location."}
+                </small>
               </label>
             )}
             <label className="field">
@@ -2062,7 +2106,9 @@ export function Workspace({
               Share these credentials directly with the intended{" "}
               {issuedCredentials.role === "sme"
                 ? "business customer"
-                : "driver"}
+                : issuedCredentials.role === "branch"
+                  ? "branch staff member"
+                  : "driver"}
               . They must change the temporary password on first sign-in.
             </p>
             <dl className="detail-list">
@@ -2071,7 +2117,9 @@ export function Workspace({
                 <dd>
                   {issuedCredentials.role === "sme"
                     ? "SME portal"
-                    : "Driver portal"}
+                    : issuedCredentials.role === "branch"
+                      ? "Branch portal"
+                      : "Driver portal"}
                 </dd>
               </div>
               <div>
@@ -2116,6 +2164,7 @@ export function Workspace({
             order={selected}
             viewer={viewer}
             accounts={data.accounts}
+            branches={data.branches}
             updated={applySnapshot}
           />
         </Modal>

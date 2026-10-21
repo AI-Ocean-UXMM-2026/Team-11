@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   CheckCircle2,
   Clock3,
@@ -15,6 +15,7 @@ import {
   type Order,
   type Viewer,
   type Account,
+  type Branch,
   type WorkspaceData,
 } from "@/lib/domain";
 
@@ -22,11 +23,13 @@ export function OrderWorkflow({
   order,
   viewer,
   accounts,
+  branches,
   updated,
 }: {
   order: Order;
   viewer: Viewer;
   accounts: Account[];
+  branches: Branch[];
   updated: (data: WorkspaceData, message?: string) => void;
 }) {
   const w = order.workflow;
@@ -39,10 +42,19 @@ export function OrderWorkflow({
   const [amount, setAmount] = useState("");
   const [fullReceipt, setFullReceipt] = useState(false);
   const uploadRetry = useRef<{ fingerprint: string; key: string } | null>(null);
+  const [backupBranch, setBackupBranch] = useState("");
+  const [originalResolution, setOriginalResolution] =
+    useState("returned_to_hq");
+  const [consignmentResolved, setConsignmentResolved] = useState(false);
+  useEffect(() => setDriver(w?.driverId ?? ""), [w?.driverId]);
   if (!w) return <p>Refresh this order to load its workflow.</p>;
   const hq = viewer.role === "hq",
     sme = viewer.role === "sme",
     isDriver = viewer.role === "driver";
+  const branch = viewer.role === "branch";
+  const canFulfil = hq || (branch && viewer.branchId === w.sourceBranchId);
+  const privateFinance = hq || sme;
+  const pendingHandoff = w.handoffs?.find((h) => h.status === "pending");
   const latest = w.evidence[0];
   const terminal = ["Done", "Cancelled"].includes(order.status);
   function act(action: string, payload: Record<string, unknown> = {}) {
@@ -139,13 +151,13 @@ export function OrderWorkflow({
                 {l.variant} · {l.quantity} pairs
               </small>
             </span>
-            {!isDriver && (
+            {privateFinance && (
               <strong>{money((l.unitPrice ?? 0) * l.quantity)} MMK</strong>
             )}
           </li>
         ))}
       </ul>
-      {!isDriver && (
+      {privateFinance && (
         <dl className="detail-list">
           <div>
             <dt>Merchandise</dt>
@@ -172,7 +184,7 @@ export function OrderWorkflow({
           <small>Driver: {w.driverName ?? "Awaiting assignment"}</small>
         </div>
       </div>
-      {!isDriver && (
+      {privateFinance && (
         <div className="workflow-checks">
           {[
             [w.paymentVerified, "Payment verified"],
@@ -198,7 +210,7 @@ export function OrderWorkflow({
           processed by this app.
         </div>
       )}
-      {!isDriver && (
+      {privateFinance && (
         <section className="workflow-section">
           <h4>
             <ShieldCheck size={17} />
@@ -342,6 +354,176 @@ export function OrderWorkflow({
           )}
         </section>
       )}
+      {pendingHandoff && (
+        <section className="workflow-section">
+          <h4>Backup request · {pendingHandoff.branchName}</h4>
+          <p className="muted">{pendingHandoff.reason}</p>
+          <p className="inline-note">
+            Original consignment: {pendingHandoff.resolution}
+          </p>
+          {branch && viewer.branchId === pendingHandoff.branchId && (
+            <div className="workflow-form">
+              <p>
+                Accepting reserves every ordered pair from your branch. Assign
+                one of your branch drivers after acceptance.
+              </p>
+              <button
+                className="button primary"
+                disabled={pending}
+                onClick={() =>
+                  act("handoff_accept", { handoffId: pendingHandoff.id })
+                }
+              >
+                Accept & reserve branch stock
+              </button>
+              <label className="field">
+                Reason if declining
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  maxLength={1000}
+                />
+              </label>
+              <button
+                className="button secondary"
+                disabled={pending || reason.trim().length < 3}
+                onClick={() =>
+                  act("handoff_decline", {
+                    handoffId: pendingHandoff.id,
+                    reason,
+                  })
+                }
+              >
+                Decline request
+              </button>
+            </div>
+          )}
+          {hq && (
+            <div className="workflow-form">
+              <label className="field">
+                Reason to cancel request
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  maxLength={1000}
+                />
+              </label>
+              <button
+                className="button secondary"
+                disabled={pending || reason.trim().length < 3}
+                onClick={() =>
+                  act("handoff_cancel", {
+                    handoffId: pendingHandoff.id,
+                    reason,
+                  })
+                }
+              >
+                Cancel branch request
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+      {hq &&
+        !terminal &&
+        !w.handoffPending &&
+        w.paymentVerified &&
+        w.reserved &&
+        !w.received &&
+        !w.hqComplete &&
+        ["Confirmed", "Preparing", "On hold"].includes(order.status) && (
+          <details className="workflow-section">
+            <summary>Arrange fulfilment from a branch</summary>
+            <div className="workflow-form">
+              <label className="field">
+                Receiving branch
+                <select
+                  value={backupBranch}
+                  onChange={(e) => setBackupBranch(e.target.value)}
+                >
+                  <option value="">Choose an open branch</option>
+                  {branches
+                    .filter(
+                      (b) => b.active !== false && b.id !== w.sourceBranchId,
+                    )
+                    .map((b) => (
+                      <option value={b.id} key={b.id}>
+                        {b.name} · {b.stock} pairs on hand
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label className="field">
+                Handoff / resolution reason
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  maxLength={1000}
+                />
+              </label>
+              {w.dispatched && !w.replacementRequired && (
+                <>
+                  <label className="field">
+                    Original consignment outcome
+                    <select
+                      value={originalResolution}
+                      onChange={(e) => setOriginalResolution(e.target.value)}
+                    >
+                      <option value="returned_to_hq">
+                        All original pairs physically returned to HQ
+                      </option>
+                      <option value="lost">
+                        Original consignment confirmed lost — restore no stock
+                      </option>
+                    </select>
+                  </label>
+                  <label className="workflow-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={consignmentResolved}
+                      onChange={(e) => setConsignmentResolved(e.target.checked)}
+                    />
+                    I confirm the original consignment is resolved
+                    {originalResolution === "returned_to_hq"
+                      ? " and every pair was physically received back at HQ"
+                      : ""}
+                    .
+                  </label>
+                </>
+              )}
+              {w.replacementRequired && (
+                <p className="inline-note">
+                  The original shipment has been reconciled. Select another
+                  branch; the previous shipment cannot resume.
+                </p>
+              )}
+              <button
+                className="button primary"
+                disabled={
+                  pending ||
+                  !backupBranch ||
+                  reason.trim().length < 3 ||
+                  (w.dispatched &&
+                    !w.replacementRequired &&
+                    !consignmentResolved)
+                }
+                onClick={() =>
+                  act("route_branch", {
+                    branchId: backupBranch,
+                    reason,
+                    originalResolution,
+                    consignmentResolved,
+                    receivedBack:
+                      consignmentResolved &&
+                      originalResolution === "returned_to_hq",
+                  })
+                }
+              >
+                Request branch acceptance
+              </button>
+            </div>
+          </details>
+        )}
       {!terminal && (
         <section className="workflow-section">
           <h4>
@@ -349,7 +531,7 @@ export function OrderWorkflow({
             Fulfilment
           </h4>
           <div className="workflow-form">
-            {hq && ["Confirmed", "Preparing"].includes(order.status) && (
+            {canFulfil && ["Confirmed", "Preparing"].includes(order.status) && (
               <>
                 <label className="field">
                   Assign driver
@@ -360,7 +542,10 @@ export function OrderWorkflow({
                     <option value="">Choose an active driver</option>
                     {accounts
                       .filter(
-                        (a) => a.role === "driver" && a.status === "Active",
+                        (a) =>
+                          a.role === "driver" &&
+                          a.status === "Active" &&
+                          (a.branchId ?? null) === (w.sourceBranchId ?? null),
                       )
                       .map((a) => (
                         <option key={a.id} value={a.id}>
@@ -379,7 +564,7 @@ export function OrderWorkflow({
               </>
             )}
             <div className="workflow-buttons">
-              {hq && order.status === "Confirmed" && (
+              {canFulfil && order.status === "Confirmed" && (
                 <button
                   className="button primary"
                   disabled={pending}
@@ -388,7 +573,7 @@ export function OrderWorkflow({
                   Start preparation
                 </button>
               )}
-              {hq && order.status === "Preparing" && (
+              {canFulfil && order.status === "Preparing" && (
                 <button
                   className="button primary"
                   disabled={pending || !w.driverId}
@@ -476,7 +661,12 @@ export function OrderWorkflow({
               {hq && order.status === "On hold" && (
                 <button
                   className="button primary"
-                  disabled={pending || reason.trim().length < 3}
+                  disabled={
+                    pending ||
+                    reason.trim().length < 3 ||
+                    w.handoffPending ||
+                    w.replacementRequired
+                  }
                   onClick={() => act("resolve", { reason })}
                 >
                   Record resolution & resume

@@ -6,4 +6,5 @@ out/
 *.tsbuildinfo
 coverage/
 .data/
+supabase/.temp/
 .DS_Store

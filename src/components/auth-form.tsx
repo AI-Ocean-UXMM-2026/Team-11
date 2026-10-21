@@ -82,6 +82,8 @@ function PortalLoginForm({
           ? "Order STT shoes, follow deliveries and keep your shop moving."
           : portal === "driver"
             ? "Your assigned deliveries and handovers, in one place."
+            : portal === "branch"
+              ? "Your branch stock, refills, retail sales and assigned deliveries."
             : "Manage your STT stock, branches and business accounts."}
       </p>
       <div className="auth-issued-note">

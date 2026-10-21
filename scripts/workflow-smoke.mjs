@@ -2,16 +2,18 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
-const base = "http://127.0.0.1:3000";
+const base = process.env.SUPPLYLINK_DEMO_URL??"http://127.0.0.1:3000";
+assert.ok(new URL(base).hostname==='127.0.0.1'&&new URL(base).protocol==='http:','Use the local demo only.');
+const branchMode=process.env.SUPPLYLINK_BRANCH_SMOKE==='true';
 const cookies = {};
-async function login(role, username) {
+async function login(role, username, cookieKey=role) {
   const response = await fetch(`${base}/api/auth/${role}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: base },
     body: JSON.stringify({ username, password: "SttDemo-2026!" }),
   });
   assert.equal(response.status, 200, `Sign in ${role}`);
-  cookies[role] = response.headers.get("set-cookie").split(";")[0];
+  cookies[cookieKey] = response.headers.get("set-cookie").split(";")[0];
 }
 async function request(role, url, options = {}) {
   const response = await fetch(base + url, {
@@ -44,6 +46,15 @@ const product = initial.data.products.find(
   (p) => p.color === "White" && p.size === "38",
 );
 const driver = initial.data.accounts.find((a) => a.username === "zawmin");
+const targetBranch=initial.data.branches.find(b=>b.name==='Hlaing branch');
+const branchDriver=initial.data.accounts.find(a=>a.username==='aungthu');
+if(branchMode){
+  await act('hq','driver_affiliation',{driverId:branchDriver.id,branchId:targetBranch.id,reason:'Demo branch verification'});
+  await login('driver','aungthu','branchdriver');
+  const transfer=await act('hq','transfer_create',{productId:product.id,quantity:2,sourceBranchId:'',destinationBranchId:targetBranch.id,reason:'Demo branch refill'});
+  await act('hq','transfer_dispatch',{transferId:transfer.result.transferId,confirmed:true});
+  await act('branch','transfer_receive',{transferId:transfer.result.transferId,confirmed:true});
+}
 const created = await act("sme", "create", {
   items: [{ productId: product.id, quantity: 2 }],
   receiver: "Demo QA Receiver",
@@ -109,7 +120,16 @@ const job = jobs.data.orders.find((o) => o.id === orderId);
 assert.ok(job);
 assert.equal(job.merchandise, 0);
 assert.equal(job.workflow.evidence.length, 0);
-await act("driver", "handover", { orderId });
+if(branchMode){
+  await act('hq','hold',{orderId,reason:'Demo HQ vehicle problem'});
+  const routed=await act('hq','route_branch',{orderId,branchId:targetBranch.id,reason:'Demo backup after original goods returned',originalResolution:'returned_to_hq',consignmentResolved:true,receivedBack:true});
+  const handoff=routed.data.orders.find(o=>o.id===orderId).workflow.handoffs[0];
+  if(process.env.SUPPLYLINK_BRANCH_PAUSE==='true'){console.log(`READY ${order.reference}: awaiting Hlaing branch acceptance. Refill and original-consignment resolution verified.`);process.exit(0);}
+  await act('branch','handoff_accept',{orderId,handoffId:handoff.id});
+  await act('branch','assign',{orderId,driverId:branchDriver.id});
+  await act('branch','prepare',{orderId});await act('branch','dispatch',{orderId});
+  await act('branchdriver','handover',{orderId});
+}else await act("driver", "handover", { orderId });
 await act("sme", "receive", { orderId, fullReceipt: true });
 const before = await request("hq", "/api/workflow");
 assert.ok(!before.data.salesEvents.some((e) => e.orderId === orderId));
@@ -123,5 +143,5 @@ console.log(
   `PASS ${order.reference}: quote → private proof → verify/reserve → assign → dispatch (retry safe) → handover → SME receipt → HQ completion → one sale`,
 );
 console.log(
-  "PASS anonymous and driver proof access denied; driver monetary data withheld",
+  "PASS anonymous and driver proof access denied; driver monetary data withheld"+(branchMode?"; branch refill, backup and affiliated driver verified":""),
 );

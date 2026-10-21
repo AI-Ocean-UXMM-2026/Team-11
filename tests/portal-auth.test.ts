@@ -103,9 +103,39 @@ describe("HQ-issued portal credentials", () => {
   it("uses stable portal endpoints rather than role query parameters", () => {
     expect(workspaceHref("sme", "orders", true)).toBe("/sme/orders");
     expect(workspaceHref("driver", "overview")).toBe("/driver");
+    expect(workspaceHref("branch", "deliveries")).toBe("/branch/deliveries");
+    expect(portalHome("branch")).toBe("/branch");
     expect(portalHome("hq")).toBe("/");
     expect(
       loginSchema.safeParse({ username: "bad@account", password: "x" }).success,
     ).toBe(false);
+  });
+  it("issues a branch-scoped credential only when a branch is selected", () => {
+    const hq = directory.authenticate("hq", "hq.admin", DEMO_PASSWORD);
+    expect(
+      directory.provision(hq.token, { ...input, role: "branch" }).error,
+    ).toMatch(/branch/);
+    const branchId = "10000000-0000-4000-8000-000000000001";
+    expect(
+      directory.provision(hq.token, {
+        ...input,
+        role: "branch",
+        username: "branch.new",
+        branchId,
+      }).id,
+    ).toBeTruthy();
+    const login = directory.authenticate(
+      "branch",
+      "branch.new",
+      input.password,
+    );
+    expect(login.user).toMatchObject({
+      role: "branch",
+      branchId,
+      mustChangePassword: true,
+    });
+    expect(
+      directory.authenticate("sme", "branch.new", input.password).status,
+    ).toBe(401);
   });
 });

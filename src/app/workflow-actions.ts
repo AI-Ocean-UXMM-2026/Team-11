@@ -5,6 +5,18 @@ import {
   workflowSnapshot,
 } from "@/lib/workflow/server";
 const publicActions = new Set([
+  "branch_create",
+  "branch_update",
+  "branch_close",
+  "driver_affiliation",
+  "transfer_create",
+  "transfer_dispatch",
+  "transfer_receive",
+  "transfer_cancel",
+  "route_branch",
+  "handoff_accept",
+  "handoff_decline",
+  "handoff_cancel",
   "create",
   "retail",
   "configure",

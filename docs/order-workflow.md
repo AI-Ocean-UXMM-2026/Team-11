@@ -1,6 +1,6 @@
 # Saved order and delivery workflow
 
-Implemented in phase 2. The app uses Next.js server actions and authenticated HTTP routes with the same transactional Postgres functions in both modes. The hosted Supabase project has **not** been connected or tested. Local testing was selected for this phase.
+Implemented in phase 2. The app uses Next.js server actions and authenticated HTTP routes with the same transactional Postgres functions in both modes. The hosted **Supply Link** Supabase project is now connected and its transactional workflow has passed rollback testing. See [live setup](live-supabase.md). The original local demo remains available with an explicit environment switch.
 
 ## Run locally
 
@@ -53,6 +53,6 @@ The RPCs run with a fixed empty search path, authorize using `auth.uid()` and lo
 
 `npm test`, `npm run typecheck`, `npm run build`. With the explicit local demo running on port 3000, `npm run smoke:workflow` signs in sample users and creates a labelled synthetic order through Done, including private image upload/download, access-denial checks, dispatch replay, and one sales event. It checks the demo flag before creating records. No real transfer is performed. Database tests cover stock contention, rejected/stale proof, cancellation/refund flag, ownership, driver scope and protected retail stock.
 
-Verified on 21 October 2026: 43 tests, TypeScript, production build and the HTTP workflow smoke check passed. Browser verification confirmed saved quotes survive app restarts, the completed order retains its driver, and the mobile dialog prevents background scrolling. Hosted Auth/Storage validation remains pending.
+Verified on 21 October 2026: 43 tests, TypeScript, production build and the HTTP workflow smoke check passed. Browser verification confirmed saved quotes survive app restarts, the completed order retains its driver, and the mobile dialog prevents background scrolling. Hosted Auth/Storage and rollback workflow validation subsequently passed; see [live setup](live-supabase.md).
 
 ![Completed local order](screenshots/phase2-completed-order.png)

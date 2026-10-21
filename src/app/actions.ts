@@ -104,6 +104,16 @@ export async function provisionAccount(
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const value = parsed.data;
+  if (value.branchId) {
+    const { data: branch } = await admin
+      .from("branches")
+      .select("id")
+      .eq("id", value.branchId)
+      .eq("active", true)
+      .single();
+    if (!branch)
+      return { error: "Choose an open branch before issuing credentials." };
+  }
   const { data, error } = await admin.auth.admin.createUser({
     email: loginEmail(value.username),
     password: value.password,
@@ -121,7 +131,7 @@ export async function provisionAccount(
     role: value.role,
     phone: value.phone,
     address: value.address,
-    branch_id: value.role === "driver" ? value.branchId || null : null,
+    branch_id: value.role !== "sme" ? value.branchId || null : null,
     created_by: user.id,
     must_change_password: true,
   });
