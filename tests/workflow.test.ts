@@ -61,6 +61,11 @@ beforeAll(async () => {
     "202610210003_order_workflow.sql",
     "202610210004_order_history.sql",
     "20261021045326_branch_operations.sql",
+    "20261021060000_workspace_pagination.sql",
+    "20261021060001_branch_sales_totals.sql",
+    "20261021083626_account_locations_order_ids.sql",
+    "20261021092923_branch_location_pins.sql",
+    "20261021104603_driver_pickup_tracking.sql",
   ])
     await db.exec(await readFile(`supabase/migrations/${name}`, "utf8"));
   await db.exec(await readFile("supabase/seed.sql", "utf8"));
@@ -107,9 +112,11 @@ const quote = () => ({
   receiver: "Receiver",
   phone: "09123456789",
   address: "Hlaing, Yangon",
+  pin: { latitude: 16.84, longitude: 96.17 },
   area: "Yangon",
   expectedTotal: 95000,
 });
+
 it("requires configured quotes; ignores supplied prices and enforces minimums", async () => {
   await expect(rpc("sme", "create", quote())).rejects.toThrow("configure");
   await expect(
@@ -132,8 +139,21 @@ it("requires configured quotes; ignores supplied prices and enforces minimums", 
     }),
   ).rejects.toThrow("minimum");
   const key = randomUUID();
+  for (const pin of [
+    { latitude: 91, longitude: 96 },
+    { latitude: 16, longitude: -181 },
+    { latitude: 16 },
+    { latitude: "16", longitude: 96 },
+  ]) {
+    await expect(rpc("sme", "create", { ...quote(), pin })).rejects.toThrow(
+      "location pin",
+    );
+  }
   const result = await rpc("sme", "create", quote(), key);
   order = result.orderId;
+  const saved = (await snapshot("sme")).orders.find((o) => o.id === order)!;
+  expect(saved.pin).toEqual(quote().pin);
+  expect(saved.reference).toBe(`STT-${order.toUpperCase()}`);
   expect((await rpc("sme", "create", quote(), key)).orderId).toBe(order);
   await expect(
     rpc("sme", "create", { ...quote(), receiver: "Someone else" }, key),
@@ -224,6 +244,7 @@ it("dispatches once, scopes driver jobs, and records a sale only after both conf
   await expect(rpc("hq", "complete", { orderId: order })).rejects.toThrow(
     "handover",
   );
+  await rpc("driver", "pickup", { orderId: order });
   await rpc("driver", "handover", { orderId: order });
   await rpc("sme", "hold", { orderId: order, reason: "Missing pair check" });
   await expect(rpc("hq", "complete", { orderId: order })).rejects.toThrow();
@@ -430,7 +451,7 @@ it("lets only HQ create branches and scopes each branch to its own drivers", asy
   ).rejects.toThrow("Only HQ");
   const result = await rpc("hq", "branch_create", {
     name: "New location",
-    address: "Yangon test address",
+    pin: { latitude: 16.84, longitude: 96.17 },
     manager: "Manager",
   });
   const state = await snapshot("hq");
@@ -598,6 +619,7 @@ it("reconciles the original shipment before a branch accepts and dispatches its 
   expect((await snapshot("driver")).orders.some((o) => o.id === id)).toBe(
     false,
   );
+  await rpc("branchdriver", "pickup", { orderId: id });
   await rpc("branchdriver", "handover", { orderId: id });
   await rpc("sme", "receive", { orderId: id, fullReceipt: true });
   await rpc("hq", "complete", { orderId: id });
@@ -649,7 +671,7 @@ it("returns branch stock before closure and blocks closed branch accounts", asyn
   await expect(snapshot("branch")).rejects.toThrow("active signed-in");
   await expect(
     rpc("branchdriver", "handover", { orderId: order }),
-  ).rejects.toThrow("active account");
+  ).rejects.toThrow("active");
   await expect(
     rpc("hq", "driver_affiliation", {
       driverId: users.driver,
@@ -657,4 +679,149 @@ it("returns branch stock before closure and blocks closed branch accounts", asyn
       reason: "Invalid closed assignment",
     }),
   ).rejects.toThrow("open branch");
+});
+
+it("persists account pins for HQ and rejects incomplete or out-of-range stored coordinates", async () => {
+  expect(
+    (
+      await db.query<{ allowed: boolean }>(
+        "select has_function_privilege('authenticated','supplylink_private.workflow_execute(text,jsonb,uuid)','execute') allowed",
+      )
+    ).rows[0].allowed,
+  ).toBe(false);
+  await db.query(
+    "update public.profiles set latitude=16.84,longitude=96.17 where id=$1",
+    [users.sme],
+  );
+  expect(
+    (await snapshot("hq")).accounts.find((account) => account.id === users.sme)
+      ?.pin,
+  ).toEqual({ latitude: 16.84, longitude: 96.17 });
+  expect((await snapshot("sme")).accounts).toHaveLength(0);
+  await expect(
+    db.query("update public.profiles set longitude=null where id=$1", [
+      users.sme,
+    ]),
+  ).rejects.toThrow("profiles_location_pin");
+  await expect(
+    db.query("update public.orders set latitude=91,longitude=0 where id=$1", [
+      order,
+    ]),
+  ).rejects.toThrow("orders_location_pin");
+});
+
+it("generates different full UUID references for separate orders and preserves a creation retry", async () => {
+  const { rows } = await db.query<{ total: number }>(
+    "select (2*p.wholesale_price+s.shipping_fee)::float8 total from public.products p cross join public.workflow_settings s where p.id=$1",
+    [product],
+  );
+  const payload = { ...quote(), expectedTotal: rows[0].total };
+  const key = randomUUID();
+  const first = await rpc("sme", "create", payload, key);
+  const second = await rpc("sme", "create", payload);
+  expect(first.orderId).not.toBe(second.orderId);
+  expect((await rpc("sme", "create", payload, key)).orderId).toBe(
+    first.orderId,
+  );
+  const orders = (await snapshot("sme")).orders.filter((o) =>
+    [first.orderId, second.orderId].includes(o.id),
+  );
+  expect(orders).toHaveLength(2);
+  expect(orders.every((o) => o.reference === `STT-${o.id.toUpperCase()}`)).toBe(
+    true,
+  );
+  expect(orders.every((o) => o.pin?.latitude === payload.pin.latitude)).toBe(
+    true,
+  );
+});
+
+it("creates and edits branch pins with HQ-only authorization, retry safety and scoped snapshots", async () => {
+  const payload = {
+    name: "Pinned branch",
+    manager: "Map manager",
+    pin: { latitude: 16.8409, longitude: 96.1735 },
+  };
+  for (const pin of [
+    undefined,
+    null,
+    {},
+    { latitude: 91, longitude: 0 },
+    { latitude: 0, longitude: 181 },
+    { latitude: "16", longitude: 96 },
+  ]) {
+    await expect(
+      rpc("hq", "branch_create", { ...payload, pin }),
+    ).rejects.toThrow("branch location pin");
+  }
+  await expect(rpc("sme", "branch_create", payload)).rejects.toThrow("Only HQ");
+  const key = randomUUID();
+  const created = await rpc(
+    "hq",
+    "branch_create",
+    { ...payload, address: "Ignored address" },
+    key,
+  );
+  expect(
+    (
+      await rpc(
+        "hq",
+        "branch_create",
+        { ...payload, address: "Ignored address" },
+        key,
+      )
+    ).branchId,
+  ).toBe(created.branchId);
+  await expect(
+    rpc(
+      "hq",
+      "branch_create",
+      { ...payload, pin: { latitude: 0, longitude: 0 } },
+      key,
+    ),
+  ).rejects.toThrow("retry key");
+  const findBranch = async () =>
+    (await snapshot("hq")).branches.find((b) => b.id === created.branchId)!;
+  expect(await findBranch()).toMatchObject({
+    pin: payload.pin,
+    address: "",
+    stock: 0,
+  });
+  expect(
+    (await snapshot("sme")).branches.find((b) => b.id === created.branchId)
+      ?.pin,
+  ).toEqual(payload.pin);
+  expect(
+    (await snapshot("branchother")).branches.some(
+      (b) => b.id === created.branchId,
+    ),
+  ).toBe(false);
+  await expect(
+    rpc("sme", "branch_update", { ...payload, branchId: created.branchId }),
+  ).rejects.toThrow("Only HQ");
+  await rpc("hq", "branch_update", {
+    ...payload,
+    branchId: created.branchId,
+    pin: { latitude: 0, longitude: 0 },
+  });
+  expect((await findBranch()).pin).toEqual({ latitude: 0, longitude: 0 });
+  await rpc("hq", "branch_update", {
+    name: payload.name,
+    manager: payload.manager,
+    branchId: created.branchId,
+    address: "Must not replace the pin",
+  });
+  expect(await findBranch()).toMatchObject({
+    pin: { latitude: 0, longitude: 0 },
+    address: "",
+  });
+  await expect(
+    db.query("update public.branches set longitude=null where id=$1", [
+      created.branchId,
+    ]),
+  ).rejects.toThrow("branches_location_pin");
+  await expect(
+    db.query("update public.branches set latitude=-91 where id=$1", [
+      created.branchId,
+    ]),
+  ).rejects.toThrow("branches_location_pin");
 });

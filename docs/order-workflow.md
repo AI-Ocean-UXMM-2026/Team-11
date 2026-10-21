@@ -17,16 +17,16 @@ Demo authentication remains process-local: sample users return after a restart; 
 3. HQ opens **Wholesale orders**, views the private proof and checks the actual receiving account. Enter the actual received amount and explicitly confirm the account check. Approval requires the full quote including shipping. Rejection requires a reason; the SME can resubmit.
 4. HQ approval allocates every SKU in one transaction, or allocates none. If stock has run out, payment approval remains recorded and the order stays Awaiting verification. HQ can replenish and retry reservation, or cancel with refund follow-up.
 5. HQ selects an active driver with completed account setup, starts preparation, then dispatches. Dispatch consumes the reserved pairs once. An assigned driver sees receiver/parcel details and no order prices or proof images.
-6. The driver reports handover. SME confirms actual full receipt. HQ confirms fulfilment completion after handover. Either confirmation can arrive first; **Done** and the wholesale sales event require both, with no open issue.
+6. The driver confirms pickup to start delivery and foreground GPS sharing, then reports handover. SME confirms actual full receipt. HQ confirms fulfilment completion after handover. Either confirmation can arrive first; **Done** and the wholesale sales event require both, with no open issue.
 7. HQ, the assigned driver or the ordering SME can report an issue during delivery. Only HQ resolves the hold with a reason. Cancellation before dispatch releases allocations; verified payments are flagged for separate refund follow-up. The application never transfers or refunds money.
 
-The workspace refreshes on focus and every 15 seconds while visible. An order also has a manual refresh control. GPS remains unimplemented; status changes never imply location tracking.
+The workspace refreshes stale data on returning to the app or reconnecting. There is no interval polling. An order also has a manual refresh control. Foreground GPS starts after driver-confirmed pickup; see [driver tracking](driver-tracking.md).
 
 ## Inventory, retail and reporting
 
 HQ can record reasoned physical stock counts for HQ or a branch, and adjust future wholesale prices. Counts cannot fall below protected plus allocated stock. The branch posts actual pair quantities and selling prices; posting consumes only available branch stock and creates a retail sales event atomically.
 
-Reports and CSV exports use the same immutable sales events and Asia/Yangon dates. Wholesale is posted once at Done, retail once when the sale is posted. Payments and shipping are excluded. The synchronous workspace explicitly fails above 10,000 orders rather than silently dropping records. Pagination, returns/reversals, refund accounting, branch replacement deliveries, GPS, and account suspension/reset controls remain future work.
+Reports and CSV exports use the same immutable sales events and Asia/Yangon dates. Wholesale is posted once at Done, retail once when the sale is posted. Payments and shipping are excluded. [Paginated history](pagination.md) replaces the 10,000-order workspace restriction; totals and exports include every matching record. [Branch replacements and stock transfers](branch-operations.md) are implemented. Returns/reversals, refund accounting, background GPS, and account suspension/reset controls remain future work.
 
 ## API
 
@@ -45,7 +45,7 @@ Actions: SME `create`, `receive`, `hold`, `cancel`; Driver `handover`, `hold`; H
 
 ## Supabase rollout
 
-Apply all four migrations in order; see [setup](supabase-setup.md). Then configure a server-only storage/admin key, bootstrap HQ, sign in and configure the Yangon shipping quote and receiving-account instructions in **Settings**. Hosted defaults deliberately have no shipping quote. Add physical stock to each real branch before retail posting. No sample demo identities or orders are copied to the hosted database.
+Apply all migrations in filename order; see [setup](supabase-setup.md). Then configure a server-only storage/admin key, bootstrap HQ, sign in and configure the Yangon shipping quote and receiving-account instructions in **Settings**. Hosted defaults deliberately have no shipping quote. Add physical stock to each real branch before retail posting. No sample demo identities or orders are copied to the hosted database.
 
 The RPCs run with a fixed empty search path, authorize using `auth.uid()` and lock inventory/order rows. Authenticated clients have no direct table mutation grants. New internal tables use RLS with no direct authenticated read/write grants; approved functions provide scoped access. Security-definer helpers are not callable by clients.
 

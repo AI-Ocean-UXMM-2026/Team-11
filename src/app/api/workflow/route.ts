@@ -3,6 +3,7 @@ import {
   workflowActor,
   workflowSnapshot,
   WorkflowError,
+  parseWorkspaceQuery,
 } from "@/lib/workflow/server";
 const actions = new Set([
   "branch_create",
@@ -27,6 +28,7 @@ const actions = new Set([
   "assign",
   "prepare",
   "dispatch",
+  "pickup",
   "handover",
   "receive",
   "complete",
@@ -36,11 +38,14 @@ const actions = new Set([
 ]);
 import { samePortalOrigin } from "@/lib/workflow/origin";
 import { isDemoMode } from "@/lib/supabase/config";
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const raw = new URL(request.url).searchParams.get("query") ?? "{}";
+    if (raw.length > 4000) throw new WorkflowError("Query too large.", 413);
+    const query = parseWorkspaceQuery(JSON.parse(raw));
     return Response.json(
       {
-        data: await workflowSnapshot(await workflowActor()),
+        data: await workflowSnapshot(await workflowActor(), query),
         demo: isDemoMode(),
       },
       { headers: { "Cache-Control": "private, no-store" } },
@@ -63,7 +68,8 @@ export async function POST(request: Request) {
       throw new WorkflowError("Request too large.", 413);
     const body = await request.text();
     if (body.length > 24000) throw new WorkflowError("Request too large.", 413);
-    const { action, payload, key } = JSON.parse(body);
+    const { action, payload, key, query: input = {} } = JSON.parse(body);
+    const query = parseWorkspaceQuery(input);
     if (
       !actions.has(action) ||
       !payload ||
@@ -74,7 +80,13 @@ export async function POST(request: Request) {
     const actor = await workflowActor();
     const result = await executeWorkflow(actor, action, payload, key);
     return Response.json(
-      { result, data: await workflowSnapshot(actor) },
+      {
+        result,
+        data: await workflowSnapshot(actor, {
+          ...query,
+          orderId: query.orderId ?? result.orderId,
+        }),
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

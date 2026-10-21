@@ -19,7 +19,7 @@ To host an intentional demo, explicitly set `NEXT_PUBLIC_DEMO_MODE=true`.
 
 ## 2. Database
 
-Apply `supabase/migrations/202610200001_baseline.sql` followed by `202610200002_stt_catalog.sql`, `202610210003_order_workflow.sql`, `202610210004_order_history.sql` and `20261021045326_branch_operations.sql` in a fresh Supabase SQL editor,
+Apply `supabase/migrations/202610200001_baseline.sql` followed by `202610200002_stt_catalog.sql`, `202610210003_order_workflow.sql`, `202610210004_order_history.sql`, `20261021045326_branch_operations.sql`, `20261021060000_workspace_pagination.sql`, `20261021060001_branch_sales_totals.sql`, `20261021083626_account_locations_order_ids.sql` and `20261021092923_branch_location_pins.sql` in a fresh Supabase SQL editor,
 or apply it with your usual Supabase CLI migration workflow. Optional `supabase/seed.sql`
 adds sample branches, not user accounts. Branch stock starts empty on hosted Supabase; HQ must enter actual counts. Configure shipping and receiving-account instructions in HQ Settings before creating orders. Disable **Allow new users to sign up**
 in Supabase Authentication settings. All SME, Driver and Branch staff provisioning must go through HQ. Apply migrations before exposing the matching application UI.
@@ -66,8 +66,8 @@ The `workflow_execute` RPC validates ownership, role, first-login state and stat
 ## Remaining implementation slices
 
 1. Production deployment and Auth configuration review; hosted Auth/Storage and transaction checks are recorded in [live connection verification](live-supabase.md).
-2. Returns/reversals, physical return acceptance, refund accounting, and paginated history/reporting.
-3. Opt-in foreground GPS publishing and freshness/retention controls. Branch replacement transactions are implemented; see [branch operations](branch-operations.md).
+2. Returns/reversals, physical return acceptance and refund accounting. [Paginated history and reporting](pagination.md) are implemented.
+3. Hosted rollout and real-device verification of [foreground tracking](driver-tracking.md); background tracking remains future work. Branch replacement transactions are implemented; see [branch operations](branch-operations.md).
 4. HQ reset/suspension, session revocation and account creation reconciliation.
 
 No real payment, refund or location collection is performed by the app. Do not use local demo credentials for hosted operations.
@@ -75,3 +75,6 @@ No real payment, refund or location collection is performed by the app. Do not u
 Official integration references: [Supabase SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client?queryGroups=framework&framework=nextjs),
 [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security),
 [Next.js App Router](https://nextjs.org/docs/app/getting-started/installation).
+
+Map pickers additionally require a public Mapbox token, including in database
+demo mode. See [Mapbox setup](maps.md).

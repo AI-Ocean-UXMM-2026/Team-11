@@ -15,7 +15,7 @@ begin
   perform set_config('request.jwt.claim.sub',hq::text,true);
   perform set_config('request.jwt.claims',jsonb_build_object('sub',hq,'role','authenticated')::text,true);
   execute 'set local role authenticated';
-  payload:=jsonb_build_object('name','Rollback branch '||staff::text,'manager','Verification only','address','Verification only, Yangon');
+  payload:=jsonb_build_object('name','Rollback branch '||staff::text,'manager','Verification only','address','Verification only, Yangon','pin',jsonb_build_object('latitude',16.84,'longitude',96.17));
   response:=public.workflow_execute('branch_create',payload,retry);
   v_branch_id:=(response->>'branchId')::uuid;
   if v_branch_id is null or public.workflow_execute('branch_create',payload,retry)->>'branchId'<>v_branch_id::text then raise exception 'Branch creation or retry failed.'; end if;

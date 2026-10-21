@@ -1,6 +1,7 @@
 "use client";
+import { LocationLink } from "./location-link";
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import {
   Building2,
   Package,
@@ -10,10 +11,14 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { workflowAction } from "@/app/workflow-actions";
+import type { WorkspaceQuery } from "@/lib/workflow/query";
 import type { WorkspaceData, Viewer } from "@/lib/domain";
+import { LocationPicker } from "./location-picker";
+import { locationSchema, pinFromForm } from "@/lib/contact";
 
 function useBranchAction(
-  updated: (data: WorkspaceData, message?: string) => void,
+  updated: (data: WorkspaceData, message?: string) => void | Promise<void>,
+  query: WorkspaceQuery = {},
 ) {
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
@@ -30,11 +35,11 @@ function useBranchAction(
     setError("");
     start(async () => {
       try {
-        const r = await workflowAction(action, payload, key);
+        const r = await workflowAction(action, payload, key, query);
         if (r.error) setError(r.error);
         else if (r.data) {
           retry.current = null;
-          updated(r.data, r.result?.message);
+          await updated(r.data, r.result?.message);
           done?.();
         }
       } catch {
@@ -42,18 +47,23 @@ function useBranchAction(
       }
     });
   }
-  return { act, pending, error };
+  return { act, pending, error, setError };
 }
 export function BranchNetwork({
   data,
   updated,
+  pagination,
 }: {
   data: WorkspaceData;
-  updated: (data: WorkspaceData, message?: string) => void;
+  pagination?: ReactNode;
+  updated: (data: WorkspaceData, message?: string) => void | Promise<void>;
 }) {
   const [selected, setSelected] = useState<string>("");
   const [creating, setCreating] = useState(false);
-  const { act, pending, error } = useBranchAction(updated);
+  const { act, pending, error, setError } = useBranchAction(
+    updated,
+    data.query,
+  );
   const branch = data.branches.find((b) => b.id === selected);
   const open = data.branches.filter((b) => b.active !== false);
   return (
@@ -75,7 +85,10 @@ export function BranchNetwork({
         </div>
         <button
           className="button primary"
-          onClick={() => setCreating(!creating)}
+          onClick={() => {
+            setError("");
+            setCreating(!creating);
+          }}
         >
           <Plus size={16} />
           Create branch
@@ -91,11 +104,24 @@ export function BranchNetwork({
             onSubmit={(e) => {
               e.preventDefault();
               const form = e.currentTarget;
-              const v = Object.fromEntries(new FormData(form));
-              act("branch_create", v, () => {
-                form.reset();
-                setCreating(false);
-              });
+              const values = new FormData(form);
+              const pin = locationSchema.safeParse(pinFromForm(values));
+              if (!pin.success) {
+                setError("Choose the branch location on the map.");
+                return;
+              }
+              act(
+                "branch_create",
+                {
+                  name: values.get("name"),
+                  manager: values.get("manager"),
+                  pin: pin.data,
+                },
+                () => {
+                  form.reset();
+                  setCreating(false);
+                },
+              );
             }}
           >
             <div className="form-grid">
@@ -114,10 +140,12 @@ export function BranchNetwork({
                 <input name="manager" maxLength={100} />
               </label>
             </div>
-            <label className="field">
-              Full address
-              <textarea name="address" minLength={5} maxLength={300} required />
-            </label>
+            <LocationPicker required label="Branch location pin" />
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            )}
             <p className="muted">
               New branches start with zero stock. Issue the branch staff login
               from Accounts, then send its opening stock.
@@ -145,7 +173,11 @@ export function BranchNetwork({
               </span>
             </div>
             <h2>{b.name}</h2>
-            <p className="muted">{b.address}</p>
+            {b.pin ? (
+              <LocationLink pin={b.pin} label="View location pin" />
+            ) : (
+              <p className="muted">{b.address}</p>
+            )}
             <div className="branch-card-metrics">
               <span>
                 <Package size={16} />
@@ -228,8 +260,18 @@ export function BranchNetwork({
                   className="modal-form"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    const v = Object.fromEntries(new FormData(e.currentTarget));
-                    act("branch_update", { ...v, branchId: branch.id });
+                    const values = new FormData(e.currentTarget);
+                    const pin = locationSchema.safeParse(pinFromForm(values));
+                    if (!pin.success) {
+                      setError("Choose the branch location on the map.");
+                      return;
+                    }
+                    act("branch_update", {
+                      name: values.get("name"),
+                      manager: values.get("manager"),
+                      pin: pin.data,
+                      branchId: branch.id,
+                    });
                   }}
                 >
                   <h3>Edit location</h3>
@@ -243,16 +285,11 @@ export function BranchNetwork({
                       required
                     />
                   </label>
-                  <label className="field">
-                    Full address
-                    <textarea
-                      name="address"
-                      defaultValue={branch.address}
-                      minLength={5}
-                      maxLength={300}
-                      required
-                    />
-                  </label>
+                  <LocationPicker
+                    required
+                    label="Branch location pin"
+                    initialPin={branch.pin ?? undefined}
+                  />
                   <label className="field">
                     Manager
                     <input
@@ -431,8 +468,9 @@ export function BranchNetwork({
         data={data}
         viewer={{ id: "", name: "HQ", role: "hq" }}
         updated={updated}
+        pagination={pagination}
       />
-      {error && (
+      {error && !creating && (
         <p className="form-error" role="alert">
           {error}
         </p>
@@ -444,12 +482,14 @@ export function StockTransfers({
   data,
   viewer,
   updated,
+  pagination,
 }: {
   data: WorkspaceData;
   viewer: Viewer;
-  updated: (data: WorkspaceData, message?: string) => void;
+  pagination?: ReactNode;
+  updated: (data: WorkspaceData, message?: string) => void | Promise<void>;
 }) {
-  const { act, pending, error } = useBranchAction(updated);
+  const { act, pending, error } = useBranchAction(updated, data.query);
   return (
     <section className="panel stock-transfer-panel">
       <div className="panel-heading">
@@ -458,10 +498,7 @@ export function StockTransfers({
           <h2>Refills & returns</h2>
         </div>
         <span className="count-chip">
-          {data.transfers?.filter((t) =>
-            ["reserved", "shipping"].includes(t.status),
-          ).length ?? 0}{" "}
-          pending
+          {data.summary?.pendingTransfers ?? 0} pending
         </span>
       </div>
       <div className="transfer-list">
@@ -547,6 +584,7 @@ export function StockTransfers({
           </p>
         )}
       </div>
+      {pagination}
       {error && (
         <p className="form-error info-pad" role="alert">
           {error}

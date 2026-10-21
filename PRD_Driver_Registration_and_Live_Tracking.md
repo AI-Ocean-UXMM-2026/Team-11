@@ -91,11 +91,11 @@ Done is posted once. Subsequent returns create linked adjustments rather than de
 
 **Acceptance:** Only an active HQ-created Driver account can receive assignments and publish location. Inactive or suspended Drivers cannot operate. Driver credentials never grant HQ or branch management access.
 
-**DRV02  Assignment and access.** HQ assigns an active HQ-created Driver account to one delivery attempt. Driver sees only required receiver contact, destination, parcels and instructions. Show Start sharing, Report issue and Handover reported.
+**DRV02  Assignment and access.** HQ assigns an active HQ-created Driver account to one delivery attempt. Driver sees only required receiver contact, destination, parcels and instructions. Show Confirm pickup & start delivery, Pause/Resume live location, Report issue and Handover reported. Only the assigned driver confirms physical pickup after dispatch; record pickup once before permitting handover.
 
 **Acceptance:** Driver cannot see payment evidence, edit prices, mark HQ Complete or confirm SME receipt. Handover reporting is a delivery event, not customer confirmation.
 
-**GPS01  Location publishing.** During Shipping, driver opts into location sharing on an HTTPS mobile page. Store attempt, driver, latitude, longitude, accuracy, capture time and receipt time. Target a 10 to 15 second publish or refresh cadence when fresh positions are available.
+**GPS01  Location publishing.** During Shipping, driver confirms pickup and opts into location sharing on an HTTPS mobile page. Pickup starts foreground tracking after GPS permission is granted; permission failure does not block the delivery. Store attempt, driver, latitude, longitude, accuracy, capture time and receipt time. Target a 10 to 15 second publish or refresh cadence when fresh positions are available.
 
 **Acceptance:** Validate driver assignment, active attempt, coordinate bounds and capture time. Old or out-of-order positions cannot replace the latest valid point.
 
@@ -107,7 +107,7 @@ Done is posted once. Subsequent returns create linked adjustments rather than de
 
 **Acceptance:** Replaced drivers cannot write to the active attempt. SME sees a clear stale state rather than a false live marker.
 
-The browser demo requires the tracking page in the foreground; locking the phone or switching apps can interrupt updates. Continuous background mobile tracking is a later implementation. Limit raw location access to the owning SME, HQ and the assigned driver during the delivery; raw point retention is a launch decision, proposed at seven days.
+The browser demo requires the tracking page in the foreground; locking the phone or switching apps can interrupt updates. Continuous background mobile tracking is a later implementation. Limit raw location access to the owning SME, HQ and the assigned driver during the delivery; the initial implementation retains only the latest point per attempt and clears it when sharing ends. Historical raw-point retention remains a launch decision.
 
 Backup uses a new attempt under the same order. HQ resolves the original shipment, obtains branch acceptance and stock allocation, then assigns its driver. Preserve the old attempt and switch the SME map only to the active replacement. Keep operational reports independent of whether GPS updates are available.
 

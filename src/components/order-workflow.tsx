@@ -1,4 +1,7 @@
 "use client";
+import { LocationLink } from "./location-link";
+import { DeliveryTracking } from "./delivery-tracking";
+import { useDriverTracking } from "./driver-tracking-provider";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   CheckCircle2,
@@ -8,7 +11,7 @@ import {
   Truck,
   Upload,
 } from "lucide-react";
-import { workflowAction, refreshWorkspace } from "@/app/workflow-actions";
+import { workflowAction } from "@/app/workflow-actions";
 import {
   money,
   total,
@@ -19,20 +22,29 @@ import {
   type WorkspaceData,
 } from "@/lib/domain";
 
+import type { WorkspaceQuery } from "@/lib/workflow/query";
+
 export function OrderWorkflow({
   order,
   viewer,
   accounts,
   branches,
   updated,
+  query = {},
+  refresh,
+  demo,
 }: {
+  demo: boolean;
+  refresh: () => Promise<unknown>;
+  query?: WorkspaceQuery;
   order: Order;
   viewer: Viewer;
   accounts: Account[];
   branches: Branch[];
-  updated: (data: WorkspaceData, message?: string) => void;
+  updated: (data: WorkspaceData, message?: string) => void | Promise<void>;
 }) {
   const w = order.workflow;
+  const tracker = useDriverTracking();
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const retry = useRef<{ fingerprint: string; key: string } | null>(null);
@@ -66,13 +78,23 @@ export function OrderWorkflow({
     setError("");
     start(async () => {
       try {
-        const result = await workflowAction(action, body, key);
+        const result = await workflowAction(action, body, key, query);
         if (result.error) {
           setError(result.error);
           return;
         }
         retry.current = null;
-        if (result.data) updated(result.data, result.result?.message);
+        if (action === "handover" && tracker.trip?.orderId === order.id)
+          tracker.end();
+        if (action === "pickup" && result.result?.attemptId)
+          tracker.begin({
+            orderId: order.id,
+            attemptId: result.result.attemptId,
+            viewerId: viewer.id,
+            demo,
+            reference: order.reference,
+          });
+        if (result.data) await updated(result.data, result.result?.message);
       } catch {
         setError(
           "Connection interrupted. Retry the same action to check its recorded result.",
@@ -93,6 +115,7 @@ export function OrderWorkflow({
     if (uploadRetry.current?.fingerprint !== fingerprint)
       uploadRetry.current = { fingerprint, key: crypto.randomUUID() };
     values.set("operationKey", uploadRetry.current.key);
+    values.set("query", JSON.stringify(query));
     setError("");
     start(async () => {
       try {
@@ -108,7 +131,7 @@ export function OrderWorkflow({
           return;
         }
         uploadRetry.current = null;
-        updated(result.data, result.result?.message);
+        await updated(result.data, result.result?.message);
         form.reset();
       } catch {
         setError(
@@ -133,9 +156,13 @@ export function OrderWorkflow({
         disabled={pending}
         onClick={() =>
           start(async () => {
-            const r = await refreshWorkspace();
-            if (r.data) updated(r.data);
-            else setError(r.error ?? "Refresh failed.");
+            try {
+              await refresh();
+            } catch (error) {
+              setError(
+                error instanceof Error ? error.message : "Refresh failed.",
+              );
+            }
           })
         }
       >
@@ -181,9 +208,20 @@ export function OrderWorkflow({
             {w.phone} · {order.location}
           </p>
           {w.notes && <p>{w.notes}</p>}
+          {order.pin && (
+            <LocationLink pin={order.pin} label="Open delivery pin in map" />
+          )}
           <small>Driver: {w.driverName ?? "Awaiting assignment"}</small>
         </div>
       </div>
+      {(hq || sme || isDriver) && w.attemptId && (
+        <DeliveryTracking
+          orderId={order.id}
+          viewer={viewer}
+          demo={demo}
+          refresh={refresh}
+        />
+      )}
       {privateFinance && (
         <div className="workflow-checks">
           {[
@@ -582,15 +620,38 @@ export function OrderWorkflow({
                   Dispatch reserved pairs
                 </button>
               )}
-              {isDriver && order.status === "Shipping" && !w.handover && (
-                <button
-                  className="button primary"
-                  disabled={pending}
-                  onClick={() => act("handover")}
-                >
-                  Report delivery handover
-                </button>
-              )}
+              {isDriver &&
+                order.status === "Shipping" &&
+                !w.handover &&
+                !w.pickedUpAt && (
+                  <div>
+                    <p className="muted">
+                      Confirm once you have the parcel. Your live location will
+                      be shared with HQ and this order’s SME while Supply Link
+                      stays open. Allow GPS when asked; you can pause sharing.
+                    </p>
+                    <button
+                      type="button"
+                      className="button primary"
+                      disabled={pending || !!w.issue}
+                      onClick={() => act("pickup")}
+                    >
+                      Confirm pickup & start delivery
+                    </button>
+                  </div>
+                )}
+              {isDriver &&
+                order.status === "Shipping" &&
+                !w.handover &&
+                !!w.pickedUpAt && (
+                  <button
+                    className="button primary"
+                    disabled={pending}
+                    onClick={() => act("handover")}
+                  >
+                    Report delivery handover
+                  </button>
+                )}
               {hq && order.status === "Shipping" && (
                 <button
                   className="button primary"

@@ -4,7 +4,14 @@ import { getDemoSession } from "../auth/session";
 import { isDemoMode } from "../supabase/config";
 import { createClient } from "../supabase/server";
 import { localRequest, localIdentity } from "./local";
+import { notifyDemoTracking } from "./tracking-events";
 import type { Role, Viewer, WorkspaceData } from "../domain";
+import {
+  workspaceQuerySchema,
+  type WorkspaceQuery,
+  type ListKind,
+  type ListPage,
+} from "./query";
 
 export class WorkflowError extends Error {
   constructor(
@@ -74,6 +81,7 @@ export async function workflowActor(): Promise<Viewer> {
 export type WorkflowResult = {
   message?: string;
   orderId?: string;
+  attemptId?: string;
   intentId?: string;
   path?: string;
 };
@@ -89,14 +97,20 @@ export async function executeWorkflow(
     throw new WorkflowError("A valid retry key is required.");
   if (JSON.stringify(payload).length > 20000)
     throw new WorkflowError("This request is too large.");
-  if (isDemoMode())
-    return localRequest(actor.id, async (tx) => {
+  if (isDemoMode()) {
+    const result = await localRequest(actor.id, async (tx) => {
       const { rows } = await tx.query<{ result: WorkflowResult }>(
         "select public.workflow_execute($1,$2::jsonb,$3::uuid) as result",
         [action, JSON.stringify(payload), key],
       );
       return rows[0].result;
     });
+    notifyDemoTracking(
+      result.orderId ??
+        (typeof payload.orderId === "string" ? payload.orderId : undefined),
+    );
+    return result;
+  }
   const db = await createClient();
   const { data, error } = await db.rpc("workflow_execute", {
     p_action: action,
@@ -106,16 +120,50 @@ export async function executeWorkflow(
   if (error) throw new WorkflowError(error.message);
   return data;
 }
-export async function workflowSnapshot(actor: Viewer): Promise<WorkspaceData> {
+export function parseWorkspaceQuery(input: unknown = {}): WorkspaceQuery {
+  const result = workspaceQuerySchema.safeParse(input);
+  if (!result.success)
+    throw new WorkflowError("Invalid page or filter selection.");
+  return result.data;
+}
+export async function workflowList(
+  actor: Viewer,
+  kind: ListKind,
+  query: WorkspaceQuery,
+  page: number,
+): Promise<ListPage> {
+  const parameters = { ...parseWorkspaceQuery(query), page };
   if (isDemoMode())
     return localRequest(actor.id, async (tx) => {
-      const { rows } = await tx.query<{ result: WorkspaceData }>(
-        "select public.workflow_snapshot() as result",
+      const { rows } = await tx.query<{ result: ListPage }>(
+        "select public.workflow_list($1,$2::jsonb) as result",
+        [kind, JSON.stringify(parameters)],
       );
       return rows[0].result;
     });
   const db = await createClient();
-  const { data, error } = await db.rpc("workflow_snapshot");
+  const { data, error } = await db.rpc("workflow_list", {
+    p_kind: kind,
+    p_query: parameters,
+  });
+  if (error) throw new WorkflowError(error.message);
+  return data;
+}
+export async function workflowSnapshot(
+  actor: Viewer,
+  input: WorkspaceQuery = {},
+): Promise<WorkspaceData> {
+  const query = parseWorkspaceQuery(input);
+  if (isDemoMode())
+    return localRequest(actor.id, async (tx) => {
+      const { rows } = await tx.query<{ result: WorkspaceData }>(
+        "select public.workflow_snapshot($1::jsonb) as result",
+        [JSON.stringify(query)],
+      );
+      return rows[0].result;
+    });
+  const db = await createClient();
+  const { data, error } = await db.rpc("workflow_snapshot", { p_query: query });
   if (error) throw new WorkflowError(error.message);
   return data;
 }

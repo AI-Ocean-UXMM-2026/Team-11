@@ -4,6 +4,17 @@ HQ creates each location in **Branches**, then issues a **Branch staff** account
 
 Drivers belong to HQ or one open branch. HQ manages affiliation in **Branches**. Resolve a driver's active assignments before moving them. A location can assign only its own active drivers.
 
+HQ branch creation and editing use the same map picker as account creation.
+Choose the branch location by tapping the map, dragging the pin or using current
+location. There are no address or coordinate inputs. PostgreSQL validates and
+stores the pin; authorized branch lists open a read-only Mapbox preview. Configure
+the public Mapbox token using the [map setup guide](maps.md).
+Existing branch addresses remain visible until HQ saves a pin. Branch creation
+still starts with zero inventory and requires HQ authorization.
+
+Apply `20261021092923_branch_location_pins.sql` after the account location migration
+before using this UI with hosted Supabase. The local demo applies it automatically.
+
 ## Refill and return stock
 
 New branches start with zero pairs across the six STT variants. HQ reserves a transfer for a chosen variant, quantity and reason. The source location confirms actual dispatch; the destination confirms full physical receipt. Destination stock increases only on receipt. Repeated requests with the same retry key do not add stock twice. HQ can cancel a reserved transfer before dispatch, releasing its allocation. Transfers do not create sales revenue.

@@ -21,14 +21,16 @@ The bootstrap script refuses to rotate or replace an existing HQ account. It is 
 
 ## Database deployment
 
+The pagination update adds `20261021060000_workspace_pagination.sql` and `20261021060001_branch_sales_totals.sql`. The account/location update additionally requires `20261021083626_account_locations_order_ids.sql`. Branch map pickers additionally require `20261021092923_branch_location_pins.sql`. Apply all four before running this app version in hosted mode; these hosted deployments have not been verified here. The local demo applies them automatically. See [pagination and rollout](pagination.md).
+
 All five migrations are applied. Remote migration-history versions match the repository filenames, so a later CLI deployment can recognize them as applied:
 
-| Version        | Migration                                                      |
-| -------------- | -------------------------------------------------------------- |
-| `202610200001` | Baseline tables, Auth trigger, RLS and private evidence bucket |
-| `202610200002` | STT-only footwear catalog                                      |
-| `202610210003` | Transactional ordering, payment, stock, retail and delivery    |
-| `202610210004` | Completed driver history and branch stock summary              |
+| Version          | Migration                                                                    |
+| ---------------- | ---------------------------------------------------------------------------- |
+| `202610200001`   | Baseline tables, Auth trigger, RLS and private evidence bucket               |
+| `202610200002`   | STT-only footwear catalog                                                    |
+| `202610210003`   | Transactional ordering, payment, stock, retail and delivery                  |
+| `202610210004`   | Completed driver history and branch stock summary                            |
 | `20261021045326` | Branch management, stock transfers, driver affiliation and delivery handoffs |
 
 The branch UI was initially available before its hosted migration, causing branch creation to reach the previous order handler and report **Order not found**. Applying the fifth migration resolved that mismatch. [Branch verification](../tests/hosted-branches.sql) confirms authenticated HQ creation, retry safety, six empty stock rows, branch isolation and physical refill receipt. All test fixtures are rolled back.

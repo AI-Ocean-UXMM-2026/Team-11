@@ -6,6 +6,7 @@ import {
   executeWorkflow,
   workflowActor,
   workflowSnapshot,
+  parseWorkspaceQuery,
   WorkflowError,
 } from "@/lib/workflow/server";
 import { validateProof } from "@/lib/workflow/images";
@@ -27,6 +28,9 @@ export async function POST(
     if (!length || length > 6 * 1024 * 1024)
       throw new WorkflowError("Use a payment image under 5 MB.", 413);
     const form = await request.formData();
+    const query = parseWorkspaceQuery(
+      JSON.parse(String(form.get("query") ?? "{}")),
+    );
     const file = form.get("file");
     if (!(file instanceof File))
       throw new WorkflowError("Choose a PNG or JPEG payment image.");
@@ -80,7 +84,10 @@ export async function POST(
       localIdentity(key + ":submit"),
     );
     return Response.json(
-      { result, data: await workflowSnapshot(actor) },
+      {
+        result,
+        data: await workflowSnapshot(actor, { ...query, orderId: id }),
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

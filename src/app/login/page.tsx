@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { Store, Truck, ShieldCheck, ArrowUpRight } from "lucide-react";
+import {
+  Store,
+  Truck,
+  Building2,
+  ShieldCheck,
+  ArrowUpRight,
+} from "lucide-react";
 import { AuthLayout } from "@/components/auth-layout";
 export default function Login() {
   return (
@@ -22,6 +28,12 @@ export default function Login() {
             title: "Driver portal",
             text: "View assigned deliveries and handover details.",
             icon: Truck,
+          },
+          {
+            role: "branch",
+            title: "Branch portal",
+            text: "Manage branch stock, retail sales and assigned deliveries.",
+            icon: Building2,
           },
           {
             role: "hq",

@@ -9,7 +9,8 @@ export function localIdentity(id: string) {
   const hex = createHash("sha256").update(id).digest("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
-export const localRoot = () => path.join(process.cwd(), ".data");
+export const localRoot = () =>
+  process.env.SUPPLYLINK_DEMO_DATA_DIR ?? path.join(process.cwd(), ".data");
 export const supabaseStubs = `
   create role anon; create role authenticated; create role service_role bypassrls;
   create schema auth; create schema storage;
@@ -26,25 +27,22 @@ const runtime = globalThis as typeof globalThis & {
   workflowDb?: Promise<PGlite>;
   workflowQueue?: Promise<unknown>;
 };
-async function initialize() {
-  await mkdir(localRoot(), { recursive: true });
-  const db = new PGlite(path.join(localRoot(), "workflow"));
-  await db.waitReady;
-  const { rows } = await db.query<{ present: string | null }>(
-    "select to_regclass('public.workflow_migrations')::text as present",
-  );
-  if (!rows[0].present) {
-    await db.exec(supabaseStubs);
-    await db.exec(
-      "create table public.workflow_migrations(name text primary key)",
-    );
-  }
+const migrated = new WeakSet<PGlite>();
+// The database survives Next.js hot reload; the migration list may be newer.
+// localRequest serializes this check with operational transactions.
+async function applyMigrations(db: PGlite) {
+  if (migrated.has(db)) return;
   for (const name of [
     "202610200001_baseline.sql",
     "202610200002_stt_catalog.sql",
     "202610210003_order_workflow.sql",
     "202610210004_order_history.sql",
     "20261021045326_branch_operations.sql",
+    "20261021060000_workspace_pagination.sql",
+    "20261021060001_branch_sales_totals.sql",
+    "20261021083626_account_locations_order_ids.sql",
+    "20261021092923_branch_location_pins.sql",
+    "20261021104603_driver_pickup_tracking.sql",
   ]) {
     const done = await db.query(
       "select 1 from public.workflow_migrations where name=$1",
@@ -62,6 +60,22 @@ async function initialize() {
       ]);
     }
   }
+  migrated.add(db);
+}
+async function initialize() {
+  await mkdir(localRoot(), { recursive: true });
+  const db = new PGlite(path.join(localRoot(), "workflow"));
+  await db.waitReady;
+  const { rows } = await db.query<{ present: string | null }>(
+    "select to_regclass('public.workflow_migrations')::text as present",
+  );
+  if (!rows[0].present) {
+    await db.exec(supabaseStubs);
+    await db.exec(
+      "create table public.workflow_migrations(name text primary key)",
+    );
+  }
+  await applyMigrations(db);
   const seeded = await db.query("select 1 from public.branches limit 1");
   if (!seeded.rows.length) {
     await db.exec(
@@ -85,6 +99,7 @@ export async function localRequest<T>(
     .catch(() => {})
     .then(async () => {
       const db = await (runtime.workflowDb ??= initialize());
+      await applyMigrations(db);
       return db.transaction(async (tx) => {
         const branch = await tx.query<{ id: string }>(
           "select id from public.branches where name='Hlaing branch' limit 1",
@@ -121,8 +136,8 @@ export async function localRequest<T>(
             [id],
           );
           await tx.query(
-            `insert into public.profiles(id,username,name,role,status,must_change_password,phone,address,branch_id)
-          values($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict(id) do update set status=case when excluded.status='suspended' then excluded.status else public.profiles.status end,must_change_password=excluded.must_change_password`,
+            `insert into public.profiles(id,username,name,role,status,must_change_password,phone,address,branch_id,latitude,longitude)
+          values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) on conflict(id) do update set status=case when excluded.status='suspended' then excluded.status else public.profiles.status end,must_change_password=excluded.must_change_password`,
             [
               id,
               user.username,
@@ -133,6 +148,8 @@ export async function localRequest<T>(
               user.phone,
               user.affiliation,
               affiliation,
+              user.pin?.latitude ?? null,
+              user.pin?.longitude ?? null,
             ],
           );
         }

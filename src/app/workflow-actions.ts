@@ -3,7 +3,9 @@ import {
   executeWorkflow,
   workflowActor,
   workflowSnapshot,
+  parseWorkspaceQuery,
 } from "@/lib/workflow/server";
+import type { WorkspaceQuery } from "@/lib/workflow/query";
 const publicActions = new Set([
   "branch_create",
   "branch_update",
@@ -27,6 +29,7 @@ const publicActions = new Set([
   "assign",
   "prepare",
   "dispatch",
+  "pickup",
   "handover",
   "receive",
   "complete",
@@ -38,27 +41,26 @@ export async function workflowAction(
   action: string,
   payload: Record<string, unknown>,
   key: string,
+  input: WorkspaceQuery = {},
 ) {
   try {
+    const query = parseWorkspaceQuery(input);
     if (!publicActions.has(action)) return { error: "Unknown operation." };
     const actor = await workflowActor();
     const result = await executeWorkflow(actor, action, payload, key);
-    return { result, data: await workflowSnapshot(actor) };
+    return {
+      result,
+      data: await workflowSnapshot(actor, {
+        ...query,
+        orderId: query.orderId ?? result.orderId,
+      }),
+    };
   } catch (error) {
     return {
       error:
         error instanceof Error
           ? error.message
           : "The operation could not be completed. Retry with the same details.",
-    };
-  }
-}
-export async function refreshWorkspace() {
-  try {
-    return { data: await workflowSnapshot(await workflowActor()) };
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unable to refresh.",
     };
   }
 }

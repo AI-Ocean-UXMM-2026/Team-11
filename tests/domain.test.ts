@@ -47,19 +47,20 @@ describe("account inputs", () => {
     phone: "0912345678",
     address: "Hlaing, Yangon",
     branchId: "",
+    pin: { latitude: 16.84, longitude: 96.17 },
   };
-  it("rejects privilege escalation and malformed account IDs", () => {
+  it("rejects privilege escalation and invalid account details", () => {
     expect(accountSchema.safeParse(valid).success).toBe(true);
     expect(accountSchema.safeParse({ ...valid, role: "hq" }).success).toBe(
       false,
     );
     expect(
-      accountSchema.safeParse({ ...valid, username: "user@example.com" })
-        .success,
-    ).toBe(false);
+      accountSchema.parse({ ...valid, username: "user@example.com" }),
+    ).not.toHaveProperty("username");
     expect(
-      accountSchema.safeParse({ ...valid, password: "short" }).success,
-    ).toBe(false);
+      accountSchema.parse({ ...valid, password: "short" }),
+    ).not.toHaveProperty("password");
+    expect(accountSchema.parse(valid)).not.toHaveProperty("address");
     expect(
       accountSchema.safeParse({ ...valid, branchId: "invalid" }).success,
     ).toBe(false);

@@ -1,4 +1,5 @@
 "use server";
+import { randomUUID } from "node:crypto";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -6,6 +7,7 @@ import { accountSchema, loginEmail } from "@/lib/domain";
 import { authenticatePortal } from "@/lib/auth/login";
 import { DEMO_COOKIE, getDemoSession, getDemoToken } from "@/lib/auth/session";
 import { demoDirectory } from "@/lib/auth/demo-directory";
+import { generateTemporaryPassword } from "@/lib/auth/credentials";
 import { cookies } from "next/headers";
 import { loginPortals, portalHome, type LoginPortal } from "@/lib/portals";
 import { createClient } from "@/lib/supabase/server";
@@ -67,9 +69,12 @@ export async function changePassword(
     .single();
   redirect(portalHome(profile?.role ?? "hq"));
 }
-export async function provisionAccount(
-  input: unknown,
-): Promise<{ error?: string; id?: string }> {
+export async function provisionAccount(input: unknown): Promise<{
+  error?: string;
+  id?: string;
+  username?: string;
+  temporaryPassword?: string;
+}> {
   const parsed = accountSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   if (isDemoMode()) {
@@ -104,6 +109,8 @@ export async function provisionAccount(
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const value = parsed.data;
+  const accountId = randomUUID();
+  const temporaryPassword = generateTemporaryPassword();
   if (value.branchId) {
     const { data: branch } = await admin
       .from("branches")
@@ -115,22 +122,24 @@ export async function provisionAccount(
       return { error: "Choose an open branch before issuing credentials." };
   }
   const { data, error } = await admin.auth.admin.createUser({
-    email: loginEmail(value.username),
-    password: value.password,
+    id: accountId,
+    email: loginEmail(accountId),
+    password: temporaryPassword,
     email_confirm: true,
   });
   if (error || !data.user)
     return {
-      error:
-        "Could not create this account. The account ID may already be in use.",
+      error: "Could not create this account. Please try again.",
     };
   const { error: profileError } = await admin.from("profiles").insert({
     id: data.user.id,
     name: value.name,
-    username: value.username,
+    username: accountId,
     role: value.role,
     phone: value.phone,
-    address: value.address,
+    address: "",
+    latitude: value.pin.latitude,
+    longitude: value.pin.longitude,
     branch_id: value.role !== "sme" ? value.branchId || null : null,
     created_by: user.id,
     must_change_password: true,
@@ -143,5 +152,5 @@ export async function provisionAccount(
     };
   }
   revalidatePath("/accounts");
-  return { id: data.user.id };
+  return { id: data.user.id, username: accountId, temporaryPassword };
 }

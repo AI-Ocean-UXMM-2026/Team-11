@@ -9,7 +9,7 @@ export function WorkflowAdmin({
 }: {
   data: WorkspaceData;
   mode: "settings" | "inventory";
-  updated: (data: WorkspaceData, message?: string) => void;
+  updated: (data: WorkspaceData, message?: string) => void | Promise<void>;
 }) {
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
@@ -37,11 +37,11 @@ export function WorkflowAdmin({
     setError("");
     start(async () => {
       try {
-        const r = await workflowAction(action, payload, key);
+        const r = await workflowAction(action, payload, key, data.query);
         if (r.error) setError(r.error);
         else if (r.data) {
           retry.current = null;
-          updated(r.data, r.result?.message);
+          await updated(r.data, r.result?.message);
         }
       } catch {
         setError("Connection interrupted. Retry with the same details.");

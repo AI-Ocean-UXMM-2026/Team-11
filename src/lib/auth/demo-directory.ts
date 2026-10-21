@@ -7,6 +7,7 @@ import {
 import { demoData } from "../demo-data";
 import { accountSchema, type Account, type Role } from "../domain";
 import { DEMO_PASSWORD } from "./demo-presets";
+import { generateTemporaryPassword } from "./credentials";
 
 type DemoUser = Account & { mustChangePassword: boolean; phone: string };
 type SecretUser = DemoUser & { salt: string; hash: Buffer };
@@ -141,7 +142,12 @@ export class DemoDirectory {
   provision(
     token: string | undefined,
     input: unknown,
-  ): { error?: string; id?: string } {
+  ): {
+    error?: string;
+    id?: string;
+    username?: string;
+    temporaryPassword?: string;
+  } {
     const actor = this.session(token);
     if (actor?.role !== "hq" || actor.mustChangePassword)
       return {
@@ -150,29 +156,29 @@ export class DemoDirectory {
     const parsed = accountSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0].message };
     const v = parsed.data;
-    if (this.users.has(v.username))
-      return { error: "That account ID is already in use." };
     if (this.users.size >= 1000)
       return {
         error:
           "Demo account limit reached. Restart the demo to reset sample accounts.",
       };
     const id = randomUUID();
+    const temporaryPassword = generateTemporaryPassword();
     this.add(
       {
         id,
         name: v.name,
-        username: v.username,
+        username: id,
         role: v.role,
         status: "Active",
-        affiliation: v.address,
+        affiliation: "",
         phone: v.phone,
+        pin: v.pin,
         branchId: v.branchId || null,
         mustChangePassword: true,
       },
-      v.password,
+      temporaryPassword,
     );
-    return { id };
+    return { id, username: id, temporaryPassword };
   }
   changePassword(
     token: string | undefined,
@@ -198,5 +204,11 @@ const state = globalThis as typeof globalThis & {
   supplylinkDemoDirectory?: DemoDirectory;
 };
 export function demoDirectory() {
-  return (state.supplylinkDemoDirectory ??= new DemoDirectory());
+  const directory = (state.supplylinkDemoDirectory ??= new DemoDirectory());
+  // Next.js keeps global state through hot reload. Adopt the current methods
+  // so retained instances cannot validate new requests with an obsolete schema.
+  // Keep their account/session maps intact instead of resetting demo logins.
+  if (Object.getPrototypeOf(directory) !== DemoDirectory.prototype)
+    Object.setPrototypeOf(directory, DemoDirectory.prototype);
+  return directory;
 }

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { internationalPhone, locationSchema } from "./contact";
+import type { PageInfo, WorkspaceQuery } from "./workflow/query";
 
 export const roles = ["hq", "sme", "branch", "driver"] as const;
 export type Role = (typeof roles)[number];
@@ -20,6 +22,7 @@ export type OrderStatus =
   | "Cancelled";
 export interface Order {
   id: string;
+  pin?: { latitude: number; longitude: number } | null;
   reference: string;
   business: string;
   initials: string;
@@ -45,6 +48,8 @@ export interface Order {
     driverId: string | null;
     driverName: string | null;
     handover: boolean;
+    attemptId?: string | null;
+    pickedUpAt?: string | null;
     dispatched?: boolean;
     sourceBranchId?: string | null;
     handoffPending?: boolean;
@@ -95,6 +100,7 @@ export interface Product {
 }
 export interface Branch {
   id: string;
+  pin?: { latitude: number; longitude: number } | null;
   name: string;
   address: string;
   manager: string;
@@ -122,6 +128,8 @@ export interface Account {
   affiliation: string;
   branchId?: string | null;
   branchName?: string;
+  phone?: string;
+  pin?: { latitude: number; longitude: number } | null;
 }
 export interface RetailSale {
   id: string;
@@ -132,6 +140,22 @@ export interface RetailSale {
   date: string;
 }
 export interface WorkspaceData {
+  query?: WorkspaceQuery;
+  pagination?: Record<"orders" | "retail" | "transfers" | "report", PageInfo>;
+  selectedOrder?: Order | null;
+  attentionOrders?: Order[];
+  summary?: {
+    orders: number;
+    active: number;
+    awaiting: number;
+    held: number;
+    shipping: number;
+    wholesale: number;
+    retail: number;
+    retailCount: number;
+    pendingTransfers: number;
+  };
+  report?: { wholesale: number; retail: number; cutoff: string };
   orders: Order[];
   products: Product[];
   branches: Branch[];
@@ -175,21 +199,19 @@ export interface Viewer {
 export const accountSchema = z
   .object({
     name: z.string().trim().min(2).max(100),
-    username: z
-      .string()
-      .trim()
-      .toLowerCase()
-      .regex(
-        /^[a-z0-9][a-z0-9._-]{2,39}$/,
-        "Use 3–40 lowercase letters, numbers, dots or hyphens.",
-      ),
     role: z.enum(["sme", "driver", "branch"]),
-    password: z.string().min(12, "Use at least 12 characters.").max(128),
     phone: z.string().trim().min(6).max(30),
-    address: z.string().trim().min(2).max(300),
+    phoneCountry: z.string().default("MM"),
+    pin: locationSchema,
     branchId: z.union([z.literal(""), z.uuid()]).optional(),
   })
   .superRefine((value, context) => {
+    if (!internationalPhone(value.phone, value.phoneCountry))
+      context.addIssue({
+        code: "custom",
+        path: ["phone"],
+        message: "Enter a valid phone number for the selected country.",
+      });
     if (value.role === "branch" && !value.branchId)
       context.addIssue({
         code: "custom",
@@ -202,7 +224,11 @@ export const accountSchema = z
         path: ["branchId"],
         message: "SME accounts cannot belong to a supplier branch.",
       });
-  });
+  })
+  .transform((value) => ({
+    ...value,
+    phone: internationalPhone(value.phone, value.phoneCountry)!,
+  }));
 export function loginEmail(username: string) {
   return `${username.trim().toLowerCase()}@login.supplylink.invalid`;
 }

@@ -1,8 +1,18 @@
 "use client";
+import { LocationLink } from "./location-link";
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  workspaceScope,
+  workspaceOptions,
+  workspaceKey,
+  sameWorkspaceQuery,
+  acceptWorkspaceSnapshot,
+  WorkspaceRequestError,
+} from "@/lib/workflow/client";
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -43,10 +53,7 @@ import {
   money,
   total,
   merchandiseSales,
-  ordersCsv,
-  csvCell,
   roleNames,
-  type Account,
   type Order,
   type Product,
   type Role,
@@ -54,8 +61,14 @@ import {
   type WorkspaceData,
 } from "@/lib/domain";
 import { provisionAccount, signOut } from "@/app/actions";
-import { workflowAction, refreshWorkspace } from "@/app/workflow-actions";
+import { workflowAction } from "@/app/workflow-actions";
+import { Pagination } from "./pagination";
+import { PhoneField } from "./phone-field";
+import { LocationPicker } from "./location-picker";
+import { internationalPhone, pinFromForm, locationSchema } from "@/lib/contact";
+import type { WorkspaceQuery, ListKind } from "@/lib/workflow/query";
 import { OrderWorkflow } from "./order-workflow";
+import { DriverTrackingNotice } from "./delivery-tracking";
 import { BranchNetwork, StockTransfers } from "./branch-network";
 import { WorkflowAdmin } from "./workflow-admin";
 import { NetworkArt } from "./network-art";
@@ -131,17 +144,6 @@ function Badge({ status }: { status: string }) {
     </span>
   );
 }
-function download(filename: string, content: string) {
-  const url = URL.createObjectURL(
-    new Blob(["\uFEFF", content], { type: "text/csv;charset=utf-8;" }),
-  );
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
 function Modal({
   title,
   children,
@@ -191,9 +193,12 @@ export function Workspace({
   demo: boolean;
   section: string;
 }) {
-  const [data, setData] = useState(initialData);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All orders");
+  const [query, setQuery] = useState<WorkspaceQuery>(initialData.query ?? {});
+  const [exporting, setExporting] = useState(false);
+  const [search, setSearch] = useState(initialData.query?.search ?? "");
+  const [statusFilter, setStatusFilter] = useState(
+    initialData.query?.status ?? "All orders",
+  );
   const [issuedCredentials, setIssuedCredentials] = useState<{
     username: string;
     password: string;
@@ -214,16 +219,32 @@ export function Workspace({
   const [formError, setFormError] = useState("");
   const [pending, startTransition] = useTransition();
   const [reportChannel, setReportChannel] = useState(
-    viewer.role === "branch" ? "Retail" : "All channels",
+    initialData.query?.reportChannel ??
+      (viewer.role === "branch" ? "Retail" : "All channels"),
   );
   const [reportFrom, setReportFrom] = useState(
-    () => businessDate(new Date().toISOString()).slice(0, 7) + "-01",
+    () =>
+      initialData.query?.reportFrom ??
+      businessDate(new Date().toISOString()).slice(0, 7) + "-01",
   );
-  const [reportTo, setReportTo] = useState(() =>
-    businessDate(new Date().toISOString()),
+  const [reportTo, setReportTo] = useState(
+    () => initialData.query?.reportTo ?? businessDate(new Date().toISOString()),
   );
   const router = useRouter();
   const role = viewer.role;
+  const queryClient = useQueryClient();
+  const scope = workspaceScope(viewer, demo);
+  const effectiveQuery = { ...query, orderId: selected?.id };
+  const snapshot = useQuery({
+    ...workspaceOptions(scope, effectiveQuery),
+    initialData: sameWorkspaceQuery(effectiveQuery, initialData.query ?? {})
+      ? initialData
+      : undefined,
+  });
+  const data = snapshot.data ?? initialData;
+  const loading = snapshot.isPending || snapshot.isPlaceholderData;
+  const loadError = snapshot.error?.message ?? "";
+
   const operationRetry = useRef<{ fingerprint: string; key: string } | null>(
     null,
   );
@@ -265,29 +286,78 @@ export function Workspace({
     };
   }, [narrow, mobileNav]);
   useEffect(() => {
-    setData(initialData);
-  }, [initialData]);
+    const next = snapshot.data;
+    if (snapshot.isPlaceholderData || !next?.query) return;
+    const { orderId: _orderId, ...canonical } = next.query;
+    // Pin the server's report cutoff and clamped page into the cache before
+    // changing keys, so the same report selection never fetches twice.
+    if (!sameWorkspaceQuery(query, canonical)) {
+      queryClient.setQueryData(
+        workspaceKey(scope, { ...canonical, orderId: selected?.id }),
+        next,
+      );
+      setQuery(canonical);
+    }
+    if (selected && next.query.orderId === selected.id) {
+      setSelected(next.selectedOrder ?? null);
+    }
+  }, [
+    snapshot.data,
+    snapshot.isPlaceholderData,
+    query,
+    selected?.id,
+    queryClient,
+    viewer.id,
+    role,
+    demo,
+  ]);
   useEffect(() => {
-    const refresh = async () => {
-      if (document.visibilityState !== "visible") return;
-      const result = await refreshWorkspace().catch(() => null);
-      if (result?.data) applySnapshot(result.data);
-    };
-    const timer = setInterval(refresh, 15000);
-    window.addEventListener("focus", refresh);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("focus", refresh);
-    };
-  }, []);
+    if (
+      snapshot.error instanceof WorkspaceRequestError &&
+      [401, 403].includes(snapshot.error.status)
+    ) {
+      queryClient.clear();
+      window.location.assign(portalLogin(role));
+    }
+  }, [snapshot.error, queryClient, role]);
+  useEffect(() => {
+    if (section !== "orders" && section !== "overview") return;
+    const timer = setTimeout(() => {
+      setQuery((previous) => {
+        if (
+          (previous.search ?? "") === search &&
+          (previous.status ?? "All orders") === statusFilter
+        )
+          return previous;
+        return { ...previous, search, status: statusFilter, ordersPage: 1 };
+      });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search, statusFilter, section]);
+  useEffect(() => {
+    if (!reportFrom || !reportTo || reportFrom > reportTo) return;
+    setQuery((previous) => {
+      if (
+        previous.reportFrom === reportFrom &&
+        previous.reportTo === reportTo &&
+        (previous.reportChannel ?? "All channels") === reportChannel
+      )
+        return previous;
+      return {
+        ...previous,
+        reportFrom,
+        reportTo,
+        reportChannel: reportChannel as WorkspaceQuery["reportChannel"],
+        reportPage: 1,
+        reportCutoff: undefined,
+      };
+    });
+  }, [reportFrom, reportTo, reportChannel]);
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(""), 4500);
     return () => clearTimeout(id);
   }, [toast]);
-  function update(next: WorkspaceData) {
-    setData(next);
-  }
   function open(which: typeof modal) {
     if (which === "account" && demo && !viewer.authenticated) {
       router.push("/hq/login");
@@ -298,21 +368,24 @@ export function Workspace({
   }
   const href = (key: string) => workspaceHref(role, key, demo);
   const nav = navigations[role];
-  const awaiting = data.orders.filter(
+  const attention = data.attentionOrders ?? data.orders;
+  const awaiting = attention.filter(
     (o) => o.status === "Awaiting verification",
   );
-  const held = data.orders.filter((o) => o.status === "On hold");
-  const active = data.orders.filter(
-    (o) => !["Done", "Cancelled", "Draft"].includes(o.status),
-  );
-  const retail = data.retailSales.reduce((sum, sale) => sum + sale.amount, 0);
-  const matchedOrders = data.orders.filter(
-    (o) =>
-      `${o.reference} ${o.business} ${o.location}`
-        .toLowerCase()
-        .includes(search.toLowerCase()) &&
-      (statusFilter === "All orders" || o.status === statusFilter),
-  );
+  const held = attention.filter((o) => o.status === "On hold");
+  const summary = data.summary ?? {
+    orders: data.orders.length,
+    active: 0,
+    awaiting: awaiting.length,
+    held: held.length,
+    shipping: 0,
+    wholesale: merchandiseSales(data.orders),
+    retail: 0,
+    retailCount: data.retailSales.length,
+    pendingTransfers: 0,
+  };
+  const retail = summary.retail;
+  const matchedOrders = data.orders;
   const matchedProducts = data.products.filter((p) =>
     `${p.name} ${p.brand} ${p.size} ${p.color}`
       .toLowerCase()
@@ -322,50 +395,128 @@ export function Workspace({
     .filter((p) => basket[p.id])
     .map((p) => ({ ...p, quantity: basket[p.id] }));
   const subtotal = cart.reduce((sum, p) => sum + p.price * p.quantity, 0);
-  const reportEvents = (data.salesEvents ?? []).filter(
-    (e) =>
-      e.date >= reportFrom &&
-      e.date <= reportTo &&
-      (reportChannel === "All channels" || e.channel === reportChannel),
-  );
-  const reportWholesale = reportEvents
-    .filter((e) => e.channel === "Wholesale")
-    .reduce((sum, e) => sum + e.amount, 0);
-  const reportRetail = reportEvents
-    .filter((e) => e.channel === "Retail")
-    .reduce((sum, e) => sum + e.amount, 0);
-
+  const reportEvents = data.salesEvents ?? [];
+  const reportWholesale = data.report?.wholesale ?? 0;
+  const reportRetail = data.report?.retail ?? 0;
+  const filtersPending =
+    (section === "orders" || section === "overview") &&
+    ((data.query?.search ?? "") !== search ||
+      (data.query?.status ?? "All orders") !== statusFilter);
+  const reportPending =
+    !reportFrom ||
+    !reportTo ||
+    reportFrom > reportTo ||
+    data.query?.reportFrom !== reportFrom ||
+    data.query?.reportTo !== reportTo ||
+    (data.query?.reportChannel ?? "All channels") !== reportChannel;
+  function pageControls(kind: ListKind, label: string) {
+    const field = {
+      orders: "ordersPage",
+      retail: "retailPage",
+      transfers: "transfersPage",
+      report: "reportPage",
+    }[kind];
+    return (
+      <Pagination
+        info={data.pagination?.[kind]}
+        label={label}
+        busy={loading || filtersPending || (kind === "report" && reportPending)}
+        change={(page, pageSize) =>
+          setQuery((previous) => ({
+            ...previous,
+            ...(pageSize !== previous.pageSize
+              ? {
+                  ordersPage: 1,
+                  retailPage: 1,
+                  transfersPage: 1,
+                  reportPage: 1,
+                }
+              : {}),
+            pageSize,
+            [field]: page,
+          }))
+        }
+      />
+    );
+  }
+  async function exportRecords(kind: "orders" | "report") {
+    if (
+      loading ||
+      loadError ||
+      filtersPending ||
+      (kind === "report" && reportPending)
+    )
+      return;
+    setExporting(true);
+    try {
+      const parameters = new URLSearchParams({
+        kind,
+        query: JSON.stringify(data.query ?? {}),
+      });
+      const response = await fetch(`/api/workflow/export?${parameters}`);
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error ?? "Export failed.");
+      }
+      // Wait for the complete response before creating a download. A failed
+      // stream must never leave a seemingly successful, truncated CSV.
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `supplylink-${kind}.csv`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setToast("All matching records exported.");
+    } catch (error) {
+      setToast(
+        error instanceof Error
+          ? error.message
+          : "Export interrupted. Please retry.",
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
   function exportReport() {
-    if (reportFrom > reportTo) {
-      setToast("Choose an end date on or after the start date.");
+    void exportRecords("report");
+  }
+  async function openOrder(id: string) {
+    const current = data.orders.find((o) => o.id === id);
+    if (current) {
+      setSelected(current);
       return;
     }
-    const rows: unknown[][] = [
-      [
-        "SupplyLink merchandise sales",
-        "From",
-        reportFrom,
-        "To",
-        reportTo,
-        "Channel",
-        reportChannel,
-      ],
-      ["Reference", "Channel", "Date", "Net merchandise MMK"],
-      ...reportEvents.map((e) => [e.reference, e.channel, e.date, e.amount]),
-      ["Total", "", "", reportWholesale + reportRetail],
-    ];
-    download(
-      "supplylink-merchandise-sales.csv",
-      rows.map((r) => r.map(csvCell).join(",")).join("\r\n"),
-    );
-    setToast("Report exported with the selected filters.");
+    try {
+      const next = await queryClient.fetchQuery(
+        workspaceOptions(scope, { ...query, orderId: id }),
+      );
+      if (next.selectedOrder) setSelected(next.selectedOrder);
+      else setToast("This order is no longer available.");
+    } catch (error) {
+      setToast(
+        error instanceof Error ? error.message : "Unable to open the order.",
+      );
+    }
   }
-  function applySnapshot(next: WorkspaceData, message?: string) {
-    setData(next);
+  async function applySnapshot(next: WorkspaceData, message?: string) {
     setSelected((previous) =>
-      previous ? (next.orders.find((o) => o.id === previous.id) ?? null) : null,
+      previous
+        ? next.query?.orderId === previous.id
+          ? (next.selectedOrder ?? null)
+          : (next.orders.find((o) => o.id === previous.id) ?? previous)
+        : null,
     );
     if (message) setToast(message);
+    await acceptWorkspaceSnapshot(queryClient, scope, next);
+  }
+  function refreshReport() {
+    const next = { ...query, reportPage: 1, reportCutoff: undefined };
+    queryClient.removeQueries({
+      queryKey: workspaceKey(scope, { ...next, orderId: selected?.id }),
+      exact: true,
+    });
+    setQuery(next);
   }
   function mutate(
     action: string,
@@ -379,14 +530,19 @@ export function Workspace({
     setFormError("");
     startTransition(async () => {
       try {
-        const result = await workflowAction(action, payload, key);
+        const result = await workflowAction(
+          action,
+          payload,
+          key,
+          effectiveQuery,
+        );
         if (result.error) {
           setFormError(result.error);
           return;
         }
         operationRetry.current = null;
         if (result.data) {
-          applySnapshot(result.data, result.result?.message);
+          await applySnapshot(result.data, result.result?.message);
           onSuccess?.(result.data, result.result?.orderId);
         }
       } catch {
@@ -397,12 +553,23 @@ export function Workspace({
     });
   }
   function createOrder(form: FormData) {
+    const phone = internationalPhone(
+      String(form.get("phone") ?? ""),
+      String(form.get("phoneCountry") ?? "MM"),
+    );
+    if (!phone) {
+      setFormError(
+        "Enter a valid receiver phone number for the selected country.",
+      );
+      return;
+    }
     mutate(
       "create",
       {
         items: cart.map((p) => ({ productId: p.id, quantity: p.quantity })),
         receiver: String(form.get("receiver") ?? ""),
-        phone: String(form.get("phone") ?? ""),
+        phone,
+        pin: pinFromForm(form),
         address: String(form.get("address") ?? ""),
         area: data.settings?.area ?? "Yangon",
         expectedTotal: subtotal + (data.settings?.shipping ?? 0),
@@ -410,45 +577,48 @@ export function Workspace({
       (next, id) => {
         setBasket({});
         setModal(null);
-        setSelected(next.orders.find((o) => o.id === id) ?? null);
+        setSelected(
+          next.selectedOrder ?? next.orders.find((o) => o.id === id) ?? null,
+        );
       },
     );
   }
   function createAccount(form: FormData) {
+    const pin = locationSchema.safeParse(pinFromForm(form));
+    if (!pin.success) {
+      setFormError("Choose the account location on the map.");
+      return;
+    }
     const input = {
       name: String(form.get("name") ?? "").trim(),
-      username: String(form.get("username") ?? "")
-        .trim()
-        .toLowerCase(),
       role: String(form.get("role")) as "sme" | "driver" | "branch",
-      password: String(form.get("password") ?? ""),
       phone: String(form.get("phone") ?? ""),
-      address: String(form.get("address") ?? ""),
+      phoneCountry: String(form.get("phoneCountry") ?? "MM"),
+      pin: pin.data,
       branchId: String(form.get("branchId") ?? ""),
     };
+    setFormError("");
     startTransition(async () => {
-      const result = await provisionAccount(input);
-      if (result.error) {
-        setFormError(result.error);
-        return;
+      try {
+        const result = await provisionAccount(input);
+        if (result.error || !result.username || !result.temporaryPassword) {
+          setFormError(result.error ?? "Could not issue login credentials.");
+          return;
+        }
+        // Preserve the one-time credentials before refreshing the account list.
+        setModal(null);
+        setIssuedCredentials({
+          username: result.username,
+          password: result.temporaryPassword,
+          role: input.role,
+        });
+        await queryClient.invalidateQueries({ queryKey: scope });
+        router.refresh();
+      } catch {
+        setFormError(
+          "Connection interrupted. Check the account directory before trying again.",
+        );
       }
-      const account: Account = {
-        id: result.id!,
-        name: input.name,
-        username: input.username,
-        role: input.role,
-        status: "Pending setup",
-        branchId: input.branchId || null,
-        affiliation: input.address,
-      };
-      update({ ...data, accounts: [account, ...data.accounts] });
-      setModal(null);
-      setIssuedCredentials({
-        username: input.username,
-        password: input.password,
-        role: input.role,
-      });
-      router.refresh();
     });
   }
 
@@ -566,9 +736,14 @@ export function Workspace({
               <strong>{b.name}</strong>
               <span>
                 {role === "hq"
-                  ? `${money(data.retailSales.filter((s) => s.branchId === b.id).reduce((s, x) => s + x.amount, 0))} MMK in retail sales`
-                  : b.address}
+                  ? `${money(b.sales)} MMK in retail sales`
+                  : b.pin
+                    ? "Map location"
+                    : b.address}
               </span>
+              {role !== "hq" && b.pin && (
+                <LocationLink pin={b.pin} label="View location pin" />
+              )}
             </div>
             {role === "hq" && (
               <span
@@ -658,8 +833,8 @@ export function Workspace({
             >
               <Icon icon={n.icon} />
               <span>{n.label}</span>
-              {n.key === "orders" && awaiting.length > 0 && (
-                <span className="nav-count">{awaiting.length}</span>
+              {n.key === "orders" && summary.awaiting > 0 && (
+                <span className="nav-count">{summary.awaiting}</span>
               )}
             </Link>
           ))}
@@ -737,10 +912,10 @@ export function Workspace({
             <button
               className="icon-button notification-button"
               onClick={() => open("notifications")}
-              aria-label={`Notifications, ${awaiting.length + held.length} action items`}
+              aria-label={`Notifications, ${summary.awaiting + summary.held} action items`}
             >
               <Icon icon={Bell} size={20} />
-              {awaiting.length + held.length > 0 && <i />}
+              {summary.awaiting + summary.held > 0 && <i />}
             </button>
             <span className="topbar-divider" />
             <button
@@ -756,6 +931,7 @@ export function Workspace({
           </div>
         </header>
         <main id="main" className="main-content">
+          <DriverTrackingNotice viewer={viewer} />
           <div className="page-heading">
             <div>
               {section === "overview" ? (
@@ -867,16 +1043,24 @@ export function Workspace({
               ) : section === "orders" ? (
                 <button
                   className="button secondary"
+                  disabled={
+                    loading || exporting || filtersPending || !!loadError
+                  }
                   onClick={() => {
-                    download("supplylink-orders.csv", ordersCsv(matchedOrders));
-                    setToast("Visible orders exported.");
+                    void exportRecords("orders");
                   }}
                 >
                   <ArrowDownToLine size={16} />
                   Export orders
                 </button>
               ) : section === "reports" ? (
-                <button className="button primary" onClick={exportReport}>
+                <button
+                  className="button primary"
+                  disabled={
+                    loading || exporting || reportPending || !!loadError
+                  }
+                  onClick={exportReport}
+                >
                   <ArrowDownToLine size={16} />
                   Export report
                 </button>
@@ -884,6 +1068,22 @@ export function Workspace({
             </div>
           </div>
 
+          {loadError && (
+            <div className="pagination-error" role="alert">
+              {loadError}
+              <button
+                className="text-link"
+                onClick={() => void snapshot.refetch()}
+              >
+                Retry loading
+              </button>
+            </div>
+          )}
+          {loading && (
+            <p className="pagination-loading" role="status">
+              Updating records…
+            </p>
+          )}
           {section === "overview" && (
             <>
               <section className="network-hero">
@@ -954,10 +1154,7 @@ export function Workspace({
                   ? [
                       {
                         label: "Merchandise sales",
-                        value: money(
-                          merchandiseSales(data.orders) + retail,
-                          true,
-                        ),
+                        value: money(summary.wholesale + retail, true),
                         unit: "MMK",
                         note: "Retail + completed wholesale",
                         icon: Wallet,
@@ -965,9 +1162,9 @@ export function Workspace({
                       },
                       {
                         label: "Wholesale orders",
-                        value: String(data.orders.length),
+                        value: String(summary.orders),
                         unit: "orders",
-                        note: `${active.length} orders in progress`,
+                        note: `${summary.active} orders in progress`,
                         icon: ClipboardList,
                         detail: "All statuses",
                       },
@@ -984,12 +1181,12 @@ export function Workspace({
                       },
                       {
                         label: "Needs attention",
-                        value: String(awaiting.length + held.length).padStart(
+                        value: String(summary.awaiting + summary.held).padStart(
                           2,
                           "0",
                         ),
                         unit: "items",
-                        note: `${awaiting.length} payment review · ${held.length} delivery hold`,
+                        note: `${summary.awaiting} payment review · ${summary.held} delivery hold`,
                         icon: Clock3,
                         detail: "Action required",
                       },
@@ -998,7 +1195,7 @@ export function Workspace({
                     ? [
                         {
                           label: "Your orders",
-                          value: String(data.orders.length),
+                          value: String(summary.orders),
                           unit: "orders",
                           note: "All your wholesale orders",
                           icon: ClipboardList,
@@ -1006,7 +1203,7 @@ export function Workspace({
                         },
                         {
                           label: "In progress",
-                          value: String(active.length),
+                          value: String(summary.active),
                           unit: "orders",
                           note: "Follow the latest status",
                           icon: Truck,
@@ -1014,7 +1211,7 @@ export function Workspace({
                         },
                         {
                           label: "Completed purchases",
-                          value: money(merchandiseSales(data.orders), true),
+                          value: money(summary.wholesale, true),
                           unit: "MMK",
                           note: "Merchandise, excluding shipping",
                           icon: ShoppingBag,
@@ -1043,7 +1240,7 @@ export function Workspace({
                           },
                           {
                             label: "Transactions",
-                            value: String(data.retailSales.length),
+                            value: String(summary.retailCount),
                             unit: "sales",
                             note: "Posted retail transactions",
                             icon: ShoppingBag,
@@ -1078,7 +1275,7 @@ export function Workspace({
                       : [
                           {
                             label: "Assigned deliveries",
-                            value: String(data.orders.length),
+                            value: String(summary.orders),
                             unit: "jobs",
                             note: "Only jobs assigned to you",
                             icon: Truck,
@@ -1086,10 +1283,7 @@ export function Workspace({
                           },
                           {
                             label: "In transit",
-                            value: String(
-                              data.orders.filter((o) => o.status === "Shipping")
-                                .length,
-                            ),
+                            value: String(summary.shipping),
                             unit: "jobs",
                             note: "Dispatched deliveries",
                             icon: Package,
@@ -1134,9 +1328,7 @@ export function Workspace({
                               ? "Assigned deliveries"
                               : "Recent orders"}
                           </h2>
-                          <span className="count-chip">
-                            {data.orders.length}
-                          </span>
+                          <span className="count-chip">{summary.orders}</span>
                         </div>
                         <Link
                           href={href(
@@ -1168,8 +1360,8 @@ export function Workspace({
                             }
                           >
                             Awaiting verification
-                            {awaiting.length > 0 && (
-                              <span>{awaiting.length}</span>
+                            {summary.awaiting > 0 && (
+                              <span>{summary.awaiting}</span>
                             )}
                           </button>
                           <button
@@ -1210,7 +1402,9 @@ export function Workspace({
                       <div className="table-footer">
                         <span>
                           Showing {Math.min(matchedOrders.length, 5)} of{" "}
-                          {matchedOrders.length} orders
+                          {data.pagination?.orders.total ??
+                            matchedOrders.length}{" "}
+                          orders
                         </span>
                         <span>
                           {role === "driver"
@@ -1264,7 +1458,7 @@ export function Workspace({
                         <Icon icon={ShieldCheck} size={28} />
                         <p>
                           {role === "driver"
-                            ? "Review the receiver details before you set off. Report handover here; SME receipt is a separate confirmation. GPS sharing is not connected yet."
+                            ? "Confirm pickup when you collect the parcel to begin delivery and live location sharing. Keep Supply Link open, then report handover at the destination."
                             : "Retail availability excludes protected wholesale pairs. Backup deliveries need HQ approval and branch acceptance."}
                         </p>
                       </div>
@@ -1274,7 +1468,7 @@ export function Workspace({
                     <div className="panel-heading">
                       <h2>Your action list</h2>
                       <span className="count-chip">
-                        {awaiting.length + held.length}
+                        {summary.awaiting + summary.held}
                       </span>
                     </div>
                     {awaiting.map((o) => (
@@ -1317,7 +1511,19 @@ export function Workspace({
                         </span>
                       </button>
                     ))}
-                    {!awaiting.length && !held.length && (
+                    {summary.awaiting + summary.held > attention.length && (
+                      <Link
+                        className="text-link info-pad"
+                        href={href(
+                          role === "driver" || role === "branch"
+                            ? "deliveries"
+                            : "orders",
+                        )}
+                      >
+                        View remaining action items <ArrowRight size={15} />
+                      </Link>
+                    )}
+                    {summary.awaiting + summary.held === 0 && (
                       <div className="caught-up">
                         <CheckCheck size={27} />
                         <strong>You’re all caught up.</strong>
@@ -1347,7 +1553,11 @@ export function Workspace({
                   <span className="sr-only">Order status</span>
                   <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
+                    onChange={(e) =>
+                      setStatusFilter(
+                        e.target.value as NonNullable<WorkspaceQuery["status"]>,
+                      )
+                    }
                   >
                     {[
                       "All orders",
@@ -1367,9 +1577,7 @@ export function Workspace({
                 </label>
               </div>
               {orderTable()}
-              <div className="table-footer">
-                {matchedOrders.length} matching orders{" "}
-              </div>
+              {pageControls("orders", "Orders")}
             </section>
           )}
 
@@ -1378,10 +1586,15 @@ export function Workspace({
               data={data}
               viewer={viewer}
               updated={applySnapshot}
+              pagination={pageControls("transfers", "Transfers")}
             />
           )}
           {section === "branches" && role === "hq" && (
-            <BranchNetwork data={data} updated={applySnapshot} />
+            <BranchNetwork
+              data={data}
+              updated={applySnapshot}
+              pagination={pageControls("transfers", "Transfers")}
+            />
           )}
           {(section === "catalog" || section === "inventory") && (
             <>
@@ -1505,7 +1718,11 @@ export function Workspace({
                       </div>
                       <p>
                         <MapPin size={16} />
-                        {b.address}
+                        {b.pin ? (
+                          <LocationLink pin={b.pin} label="View location pin" />
+                        ) : (
+                          b.address
+                        )}
                       </p>
                       <p>
                         <Users size={16} />
@@ -1516,12 +1733,7 @@ export function Workspace({
                           <span>
                             <small>Retail sales</small>
                             <strong>
-                              {money(
-                                data.retailSales
-                                  .filter((s) => s.branchId === b.id)
-                                  .reduce((sum, s) => sum + s.amount, 0),
-                              )}{" "}
-                              <em>MMK</em>
+                              {money(b.sales)} <em>MMK</em>
                             </strong>
                           </span>
                           <span>
@@ -1594,7 +1806,9 @@ export function Workspace({
                               <strong>{a.name}</strong>
                             </span>
                           </td>
-                          <td>{a.username}</td>
+                          <td>
+                            <code className="account-id">{a.username}</code>
+                          </td>
                           <td>
                             {a.role === "sme"
                               ? "SME"
@@ -1604,7 +1818,17 @@ export function Workspace({
                                   ? "Driver"
                                   : "Branch staff"}
                           </td>
-                          <td>{a.affiliation}</td>
+                          <td>
+                            {a.role === "sme" && a.pin
+                              ? "Map location"
+                              : a.affiliation}
+                            {a.pin && (
+                              <LocationLink
+                                pin={a.pin}
+                                label="View location pin"
+                              />
+                            )}
+                          </td>
                           <td>
                             <Badge status={a.status} />
                           </td>
@@ -1624,7 +1848,14 @@ export function Workspace({
 
           {section === "reports" && (
             <>
-              <section className="panel report-filters">
+              <section className="panel report-filters" aria-busy={loading}>
+                <button
+                  className="button secondary"
+                  disabled={loading || reportPending}
+                  onClick={refreshReport}
+                >
+                  Refresh report
+                </button>
                 <label>
                   From
                   <input
@@ -1646,7 +1877,13 @@ export function Workspace({
                   Sales channel
                   <select
                     value={reportChannel}
-                    onChange={(e) => setReportChannel(e.target.value)}
+                    onChange={(e) =>
+                      setReportChannel(
+                        e.target.value as NonNullable<
+                          WorkspaceQuery["reportChannel"]
+                        >,
+                      )
+                    }
                   >
                     {(role === "branch"
                       ? ["Retail"]
@@ -1718,7 +1955,11 @@ export function Workspace({
               <section className="panel report-detail">
                 <div className="panel-heading">
                   <h2>Underlying sale records</h2>
-                  <span className="muted">Same records as the export</span>
+                  <span className="muted">
+                    {data.report?.cutoff
+                      ? `As of ${new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Yangon", dateStyle: "medium", timeStyle: "short" }).format(new Date(data.report.cutoff))} · Yangon`
+                      : "Same records as the export"}
+                  </span>
                 </div>
                 <div className="table-scroll">
                   <table>
@@ -1737,13 +1978,7 @@ export function Workspace({
                             {e.orderId ? (
                               <button
                                 className="text-link"
-                                onClick={() =>
-                                  setSelected(
-                                    data.orders.find(
-                                      (o) => o.id === e.orderId,
-                                    ) ?? null,
-                                  )
-                                }
+                                onClick={() => void openOrder(e.orderId!)}
                               >
                                 {e.reference}
                               </button>
@@ -1765,7 +2000,8 @@ export function Workspace({
                     </tfoot>
                   </table>
                 </div>
-                {reportWholesale + reportRetail === 0 && (
+                {pageControls("report", "Sales records")}
+                {(data.pagination?.report.total ?? 0) === 0 && (
                   <Empty
                     icon={Wallet}
                     title="No sales in this period"
@@ -1786,6 +2022,7 @@ export function Workspace({
                 </button>
               </div>
               <SalesList sales={data.retailSales} />
+              {pageControls("retail", "Sales")}
               <div className="inline-note">
                 Protected wholesale reserves are excluded from retail
                 availability.
@@ -1823,14 +2060,11 @@ export function Workspace({
                     </div>
                   </div>
                   {role === "driver" && (
-                    <div className="gps-placeholder">
-                      <MapPin size={21} />
-                      <strong>Location sharing is not connected yet</strong>
-                      <p>
-                        No live location is being collected. Use manual updates
-                        with HQ for this baseline.
-                      </p>
-                    </div>
+                    <p className="inline-note">
+                      {o.workflow?.pickedUpAt
+                        ? "Pickup confirmed. Open delivery details to view or resume live location sharing."
+                        : "Open delivery details and confirm pickup after collecting the parcel."}
+                    </p>
                   )}
                   <button
                     className="button secondary full-width"
@@ -1841,6 +2075,7 @@ export function Workspace({
                   </button>
                 </section>
               ))}
+              {pageControls("orders", "Deliveries")}
               {!data.orders.length && (
                 <Empty
                   icon={Truck}
@@ -1894,7 +2129,11 @@ export function Workspace({
                   </div>
                 </dl>
                 {(viewer.authenticated || !demo) && (
-                  <form action={signOut} className="info-pad">
+                  <form
+                    action={signOut}
+                    onSubmit={() => queryClient.clear()}
+                    className="info-pad"
+                  >
                     <button className="button secondary">
                       <LogOut size={16} />
                       Sign out
@@ -2001,40 +2240,19 @@ export function Workspace({
                   <option value="branch">Branch staff</option>
                 </select>
               </label>
-              <label className="field">
-                Account ID
-                <input
-                  name="username"
-                  required
-                  pattern="[a-z0-9][a-z0-9._-]{2,39}"
-                  placeholder="mingalar.shoes"
-                  autoComplete="off"
-                />
-              </label>
+              <div className="field">
+                <span>Account ID</span>
+                <div className="generated-id-note">
+                  UUID generated when you create the account
+                </div>
+                <small>
+                  The unique ID appears with the temporary password after
+                  creation.
+                </small>
+              </div>
             </div>
-            <div className="form-grid">
-              <label className="field">
-                Contact number
-                <input
-                  name="phone"
-                  type="tel"
-                  required
-                  minLength={6}
-                  maxLength={30}
-                  placeholder="09…"
-                />
-              </label>
-              <label className="field">
-                Location / address
-                <input
-                  name="address"
-                  required
-                  minLength={2}
-                  maxLength={300}
-                  placeholder="Hlaing, Yangon"
-                />
-              </label>
-            </div>
+            <PhoneField />
+            <LocationPicker required label="Account location pin" />
             {accountRole !== "sme" && (
               <label className="field">
                 {accountRole === "branch"
@@ -2061,21 +2279,10 @@ export function Workspace({
                 </small>
               </label>
             )}
-            <label className="field">
-              Temporary password
-              <input
-                name="password"
-                type="password"
-                required
-                minLength={12}
-                maxLength={128}
-                autoComplete="new-password"
-              />
-              <small>
-                At least 12 characters. The credential handoff appears once
-                after creation.
-              </small>
-            </label>
+            <div className="inline-note">
+              The system generates a secure temporary password. It appears once
+              with the account ID after creation.
+            </div>
             {formError && (
               <p className="form-error" role="alert">
                 {formError}
@@ -2130,6 +2337,22 @@ export function Workspace({
                 <dt>Account ID</dt>
                 <dd>
                   <code>{issuedCredentials.username}</code>
+                  <button
+                    type="button"
+                    className="text-link copy-account-id"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(
+                          issuedCredentials.username,
+                        );
+                        setToast("Account ID copied.");
+                      } catch {
+                        setToast("Select and copy the account ID above.");
+                      }
+                    }}
+                  >
+                    Copy account ID
+                  </button>
                 </dd>
               </div>
               <div>
@@ -2163,8 +2386,11 @@ export function Workspace({
             key={selected.id}
             order={selected}
             viewer={viewer}
+            demo={demo}
             accounts={data.accounts}
             branches={data.branches}
+            query={{ ...query, orderId: selected.id }}
+            refresh={() => snapshot.refetch({ throwOnError: true })}
             updated={applySnapshot}
           />
         </Modal>
@@ -2197,7 +2423,13 @@ export function Workspace({
                 <ChevronRight size={18} />
               </button>
             ))}
-            {!awaiting.length && !held.length && (
+            {summary.awaiting + summary.held > attention.length && (
+              <p>
+                Showing the latest action items. Open orders or deliveries to
+                review the rest.
+              </p>
+            )}
+            {summary.awaiting + summary.held === 0 && (
               <Empty
                 icon={Bell}
                 title="You’re all caught up"
@@ -2259,16 +2491,7 @@ export function Workspace({
               Receiver name
               <input name="receiver" required defaultValue={viewer.name} />
             </label>
-            <label className="field">
-              Receiver phone
-              <input
-                name="phone"
-                type="tel"
-                minLength={6}
-                maxLength={30}
-                required
-              />
-            </label>
+            <PhoneField label="Receiver phone" />
             <label className="field">
               Delivery address
               <textarea
@@ -2278,6 +2501,7 @@ export function Workspace({
                 defaultValue="Hlaing, Yangon"
               />
             </label>
+            <LocationPicker label="Delivery location pin" />
             <div className="inline-note">
               Save this quote, then submit full-payment evidence. Stock is
               reserved only after HQ verifies the actual transfer.

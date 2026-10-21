@@ -70,4 +70,4 @@ active STT rows; the application also filters its catalog by brand.
 Configure real Supabase credentials using `docs/supabase-setup.md`. Demo users are never created
 in your hosted database. Live credentials are issued through Supabase Auth Admin by authorised HQ.
 
-Driver assignments, payment evidence and fulfilment actions are now implemented in [phase 2](order-workflow.md). GPS remains future work.
+Driver assignments, payment evidence and fulfilment actions are now implemented in [phase 2](order-workflow.md). Foreground GPS is implemented in [driver tracking](driver-tracking.md).

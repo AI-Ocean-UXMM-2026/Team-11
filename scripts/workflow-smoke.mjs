@@ -60,6 +60,7 @@ const created = await act("sme", "create", {
   receiver: "Demo QA Receiver",
   phone: "09000000000",
   address: "Demo QA, Hlaing, Yangon",
+  pin: { latitude: 16.85, longitude: 96.18 },
   area: "Yangon",
   expectedTotal: product.price * 2 + initial.data.settings.shipping,
 });
@@ -120,6 +121,33 @@ const job = jobs.data.orders.find((o) => o.id === orderId);
 assert.ok(job);
 assert.equal(job.merchandise, 0);
 assert.equal(job.workflow.evidence.length, 0);
+if(process.env.SUPPLYLINK_TRACKING_PAUSE==='true') {
+  console.log(`READY ${order.reference}: dispatched and awaiting driver pickup.`);
+  process.exit(0);
+}
+async function trackDelivery(role) {
+  const pickupKey=randomUUID();
+  await act(role,'pickup',{orderId},pickupKey);
+  await act(role,'pickup',{orderId},pickupKey);
+  const state=await request(role,`/api/orders/${orderId}/tracking`);
+  assert.equal(state.data.canPublish,true);
+  const stream=await fetch(`${base}/api/orders/${orderId}/tracking/events`,{headers:{Cookie:cookies.sme},signal:AbortSignal.timeout(10000)});
+  assert.equal(stream.status,200);
+  const reader=stream.body.getReader();
+  assert.match(new TextDecoder().decode((await reader.read()).value),/event: change/);
+  await request(role,`/api/orders/${orderId}/tracking`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({attemptId:state.data.attemptId,state:'sharing',point:{latitude:16.84,longitude:96.17,accuracy:12,capturedAt:new Date().toISOString()}})
+  });
+  assert.match(new TextDecoder().decode((await reader.read()).value),/event: change/);
+  await reader.cancel();
+  const located=await request('sme',`/api/orders/${orderId}/tracking`);
+  assert.equal(located.data.point.latitude,16.84);
+  const privateLocation=await fetch(`${base}/api/orders/${orderId}/tracking`,{headers:{Cookie:cookies.branch}});
+  assert.equal(privateLocation.status,403);
+  const anonLocation=await fetch(`${base}/api/orders/${orderId}/tracking`);
+  assert.equal(anonLocation.status,401);
+}
 if(branchMode){
   await act('hq','hold',{orderId,reason:'Demo HQ vehicle problem'});
   const routed=await act('hq','route_branch',{orderId,branchId:targetBranch.id,reason:'Demo backup after original goods returned',originalResolution:'returned_to_hq',consignmentResolved:true,receivedBack:true});
@@ -128,8 +156,15 @@ if(branchMode){
   await act('branch','handoff_accept',{orderId,handoffId:handoff.id});
   await act('branch','assign',{orderId,driverId:branchDriver.id});
   await act('branch','prepare',{orderId});await act('branch','dispatch',{orderId});
+  await trackDelivery('branchdriver');
   await act('branchdriver','handover',{orderId});
-}else await act("driver", "handover", { orderId });
+}else {
+  await trackDelivery('driver');
+  await act("driver", "handover", { orderId });
+}
+const stopped=await request('sme',`/api/orders/${orderId}/tracking`);
+assert.equal(stopped.data.canPublish,false);
+assert.equal(stopped.data.point,null);
 await act("sme", "receive", { orderId, fullReceipt: true });
 const before = await request("hq", "/api/workflow");
 assert.ok(!before.data.salesEvents.some((e) => e.orderId === orderId));
@@ -140,7 +175,7 @@ assert.equal(
   1,
 );
 console.log(
-  `PASS ${order.reference}: quote → private proof → verify/reserve → assign → dispatch (retry safe) → handover → SME receipt → HQ completion → one sale`,
+  `PASS ${order.reference}: quote → private proof → verify/reserve → assign → dispatch (retry safe) → pickup → GPS/SSE → handover → SME receipt → HQ completion → one sale`,
 );
 console.log(
   "PASS anonymous and driver proof access denied; driver monetary data withheld"+(branchMode?"; branch refill, backup and affiliated driver verified":""),

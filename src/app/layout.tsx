@@ -7,6 +7,7 @@ import "@fontsource/manrope/800.css";
 import "./globals.css";
 import "@/styles/accessibility.css";
 import "@/styles/footwear.css";
+import { DriverTrackingProvider } from "@/components/driver-tracking-provider";
 export const metadata: Metadata = {
   title: "SupplyLink · Your network, connected",
   description:
@@ -19,7 +20,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" data-scroll-behavior="smooth">
-      <body>{children}</body>
+      <body>
+        <DriverTrackingProvider>{children}</DriverTrackingProvider>
+      </body>
     </html>
   );
 }
