@@ -56,20 +56,18 @@ With demo mode enabled, use the public example password **`SttDemo-2026!`**:
 
 The demo adapter keeps salted password hashes and opaque sessions **in server memory**. It is
 only a local demonstration adapter and resets when the server restarts. Supabase remains the
-live database and authentication provider. HQ's anonymous demo overview is read-only for account
-provisioning: actual credential creation requires an HQ demo login. Existing sample users are
+live database and authentication provider. All operational portals now require sign-in, including the HQ demo. Orders and stock persist locally; sessions and newly issued demo credentials reset on restart. Existing sample users are
 pre-activated for easy preview; newly provisioned users must change their password.
 
 ## Existing Supabase projects
 
 Apply `supabase/migrations/202610200002_stt_catalog.sql` after migration 001. It adds brand,
 size and color, installs the six STT variants and deactivates the original grocery sample SKUs.
-Historical rows and order references are preserved. New projects apply both migrations before
+Historical rows and order references are preserved. New projects also apply migrations 003 and 004 for transactional order/payment/stock/delivery operations and completed driver history before
 the optional branch seed. The authenticated catalog policy restricts SMEs and branch staff to
 active STT rows; the application also filters its catalog by brand.
 
 Configure real Supabase credentials using `docs/supabase-setup.md`. Demo users are never created
 in your hosted database. Live credentials are issued through Supabase Auth Admin by authorised HQ.
 
-Driver assignment/GPS, payment evidence and operational mutations remain the baseline's next
-implementation slices. This change adds portal authentication and the footwear catalog, not those flows.
+Driver assignments, payment evidence and fulfilment actions are now implemented in [phase 2](order-workflow.md). GPS remains future work.

@@ -6,11 +6,11 @@ SMEs and Drivers now have dedicated sign-in pages using HQ-issued credentials. S
 
 A supplier management and wholesale ordering platform connecting SMEs with a supplier's headquarters, retail branches, and delivery drivers.
 
-**Project status:** Next.js + Supabase baseline implemented. The requirements below describe the intended full MVP; they are not all implemented. The newer [PRD](PRD_Driver_Registration_and_Live_Tracking.md) is the source of truth for HQ-managed accounts and full upfront payments.
+**Project status:** Next.js + Supabase baseline and phase 2 order workflow implemented. The requirements below describe the intended full MVP; they are not all implemented. The newer [PRD](PRD_Driver_Registration_and_Live_Tracking.md) is the source of truth for HQ-managed accounts and full upfront payments.
 
 Run `npm install`, copy `.env.example` to `.env.local`, then run `npm run dev` and open http://127.0.0.1:3000. Demo mode works without credentials. See [implementation and routes](docs/implementation.md), [Supabase setup](docs/supabase-setup.md), and [design references](docs/design.md). Use `npm test`, `npm run typecheck`, and `npm run build` to validate the baseline.
 
-The baseline includes four role previews, orders/search/detail/CSV, catalog/draft baskets, branch sale demos, account provisioning, Supabase SSR Auth and an RLS migration. Payment review, atomic operational transactions, complete historical reports and live GPS remain next-phase work. No hosted database has been connected yet.
+The connected workflow now includes saved STT quotes, private payment evidence, HQ review, atomic stock reservation, driver assignment/dispatch/handover, SME receipt, HQ completion, protected retail posting and sales-event reports. Local demo data persists in a private Postgres directory. Hosted Supabase is prepared but remains unconfigured; local testing was selected. See [phase 2 walkthrough and API](docs/order-workflow.md). GPS, branch replacement deliveries, returns/refund accounting and account lifecycle controls remain future work.
 
 ## Overview
 
@@ -42,7 +42,7 @@ HQ and branch drivers use the same Driver role, with their affiliation and assig
 
 ## Order workflow
 
-1. SME registers and reviews the catalog, prices, locations, and FAQs.
+1. HQ issues the SME account; the SME signs in and reviews the catalog, prices, locations, and FAQs.
 2. SME selects products and quantities, enters delivery details, and reviews the final quoted total: goods after discounts plus shipping.
 3. SME transfers the full order total outside the platform and uploads payment evidence.
 4. Headquarters verifies that the actual transfer matches the full quoted total and checks available stock, then confirms the order and reserves stock. Underpayment or an amount mismatch requires correction before confirmation, preparation, or dispatch.

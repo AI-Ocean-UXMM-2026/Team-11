@@ -1,5 +1,7 @@
 # Baseline delivery
 
+Phase 2 supersedes the browser-only actions described in this original baseline note. All portals now require login and use saved transactional order/payment/stock/delivery operations. See [the current workflow guide](order-workflow.md) for implementation, API and verification details. Local testing was selected; hosted Supabase remains unconfigured.
+
 Stack: Next.js App Router, React, TypeScript, Supabase Auth/Postgres/Storage, Manrope and Lucide.
 
 ## Local development

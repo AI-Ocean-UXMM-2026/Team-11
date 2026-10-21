@@ -39,6 +39,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  businessDate,
   money,
   total,
   merchandiseSales,
@@ -53,6 +54,9 @@ import {
   type WorkspaceData,
 } from "@/lib/domain";
 import { provisionAccount, signOut } from "@/app/actions";
+import { workflowAction, refreshWorkspace } from "@/app/workflow-actions";
+import { OrderWorkflow } from "./order-workflow";
+import { WorkflowAdmin } from "./workflow-admin";
 import { NetworkArt } from "./network-art";
 import { ShoeCatalog } from "./shoe-catalog";
 import { workspaceHref, portalLogin } from "@/lib/portals";
@@ -207,11 +211,17 @@ export function Workspace({
   const [reportChannel, setReportChannel] = useState(
     viewer.role === "branch" ? "Retail" : "All channels",
   );
-  const [reportFrom, setReportFrom] = useState("2026-10-01");
-  const [reportTo, setReportTo] = useState("2026-10-31");
+  const [reportFrom, setReportFrom] = useState(
+    () => businessDate(new Date().toISOString()).slice(0, 7) + "-01",
+  );
+  const [reportTo, setReportTo] = useState(() =>
+    businessDate(new Date().toISOString()),
+  );
   const router = useRouter();
   const role = viewer.role;
-  const storageKey = `supplylink-stt-v2-${viewer.id}`;
+  const operationRetry = useRef<{ fingerprint: string; key: string } | null>(
+    null,
+  );
   useEffect(() => {
     const query = window.matchMedia("(max-width: 700px)");
     const sync = () => setNarrow(query.matches);
@@ -250,16 +260,21 @@ export function Workspace({
     };
   }, [narrow, mobileNav]);
   useEffect(() => {
-    if (demo) {
-      try {
-        const saved = sessionStorage.getItem(storageKey);
-        if (saved)
-          setData({ ...JSON.parse(saved), accounts: initialData.accounts });
-      } catch {
-        sessionStorage.removeItem(storageKey);
-      }
-    }
-  }, [demo, storageKey]);
+    setData(initialData);
+  }, [initialData]);
+  useEffect(() => {
+    const refresh = async () => {
+      if (document.visibilityState !== "visible") return;
+      const result = await refreshWorkspace().catch(() => null);
+      if (result?.data) applySnapshot(result.data);
+    };
+    const timer = setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(""), 4500);
@@ -267,7 +282,6 @@ export function Workspace({
   }, [toast]);
   function update(next: WorkspaceData) {
     setData(next);
-    if (demo) sessionStorage.setItem(storageKey, JSON.stringify(next));
   }
   function open(which: typeof modal) {
     if (which === "account" && demo && !viewer.authenticated) {
@@ -303,20 +317,18 @@ export function Workspace({
     .filter((p) => basket[p.id])
     .map((p) => ({ ...p, quantity: basket[p.id] }));
   const subtotal = cart.reduce((sum, p) => sum + p.price * p.quantity, 0);
-  const reportOrders = data.orders.filter(
-    (o) =>
-      (o.salesDate ?? o.date) >= reportFrom &&
-      (o.salesDate ?? o.date) <= reportTo,
+  const reportEvents = (data.salesEvents ?? []).filter(
+    (e) =>
+      e.date >= reportFrom &&
+      e.date <= reportTo &&
+      (reportChannel === "All channels" || e.channel === reportChannel),
   );
-  const reportSales = data.retailSales.filter(
-    (s) => s.date >= reportFrom && s.date <= reportTo,
-  );
-  const reportWholesale =
-    reportChannel === "Retail" ? 0 : merchandiseSales(reportOrders);
-  const reportRetail =
-    reportChannel === "Wholesale"
-      ? 0
-      : reportSales.reduce((sum, s) => sum + s.amount, 0);
+  const reportWholesale = reportEvents
+    .filter((e) => e.channel === "Wholesale")
+    .reduce((sum, e) => sum + e.amount, 0);
+  const reportRetail = reportEvents
+    .filter((e) => e.channel === "Retail")
+    .reduce((sum, e) => sum + e.amount, 0);
 
   function exportReport() {
     if (reportFrom > reportTo) {
@@ -334,19 +346,7 @@ export function Workspace({
         reportChannel,
       ],
       ["Reference", "Channel", "Date", "Net merchandise MMK"],
-      ...(reportChannel === "Retail"
-        ? []
-        : reportOrders
-            .filter((o) => o.status === "Done")
-            .map((o) => [
-              o.reference,
-              "Wholesale",
-              o.salesDate ?? o.date,
-              o.merchandise,
-            ])),
-      ...(reportChannel === "Wholesale"
-        ? []
-        : reportSales.map((s) => [s.id, "Retail", s.date, s.amount])),
+      ...reportEvents.map((e) => [e.reference, e.channel, e.date, e.amount]),
       ["Total", "", "", reportWholesale + reportRetail],
     ];
     download(
@@ -355,39 +355,59 @@ export function Workspace({
     );
     setToast("Report exported with the selected filters.");
   }
-  function createDemoOrder(form: FormData) {
-    if (!cart.length) {
-      setFormError("Add at least one product to your order.");
-      return;
-    }
-    const address = String(form.get("address") ?? "").trim();
-    const receiver = String(form.get("receiver") ?? "").trim();
-    if (!address || !receiver) {
-      setFormError("Enter the receiver and delivery address.");
-      return;
-    }
-    const order: Order = {
-      id: crypto.randomUUID(),
-      reference: `DRAFT-${Date.now().toString().slice(-6)}`,
-      business: viewer.name,
-      initials: viewer.name
-        .split(" ")
-        .slice(0, 2)
-        .map((n) => n[0])
-        .join(""),
-      location: address,
-      items: cart.reduce((s, p) => s + p.quantity, 0),
-      merchandise: subtotal,
-      shipping: 5000,
-      status: "Draft",
-      date: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Yangon" }),
-      source: "STT Yangon HQ",
-    };
-    update({ ...data, orders: [order, ...data.orders] });
-    setBasket({});
-    setModal(null);
-    setToast("Demo draft saved. Payment submission is a next-phase feature.");
-    router.push(href("orders"));
+  function applySnapshot(next: WorkspaceData, message?: string) {
+    setData(next);
+    setSelected((previous) =>
+      previous ? (next.orders.find((o) => o.id === previous.id) ?? null) : null,
+    );
+    if (message) setToast(message);
+  }
+  function mutate(
+    action: string,
+    payload: Record<string, unknown>,
+    onSuccess?: (next: WorkspaceData, id?: string) => void,
+  ) {
+    const fingerprint = JSON.stringify([action, payload]);
+    if (operationRetry.current?.fingerprint !== fingerprint)
+      operationRetry.current = { fingerprint, key: crypto.randomUUID() };
+    const key = operationRetry.current.key;
+    setFormError("");
+    startTransition(async () => {
+      try {
+        const result = await workflowAction(action, payload, key);
+        if (result.error) {
+          setFormError(result.error);
+          return;
+        }
+        operationRetry.current = null;
+        if (result.data) {
+          applySnapshot(result.data, result.result?.message);
+          onSuccess?.(result.data, result.result?.orderId);
+        }
+      } catch {
+        setFormError(
+          "Connection interrupted. Retry the same details to check the result.",
+        );
+      }
+    });
+  }
+  function createOrder(form: FormData) {
+    mutate(
+      "create",
+      {
+        items: cart.map((p) => ({ productId: p.id, quantity: p.quantity })),
+        receiver: String(form.get("receiver") ?? ""),
+        phone: String(form.get("phone") ?? ""),
+        address: String(form.get("address") ?? ""),
+        area: data.settings?.area ?? "Yangon",
+        expectedTotal: subtotal + (data.settings?.shipping ?? 0),
+      },
+      (next, id) => {
+        setBasket({});
+        setModal(null);
+        setSelected(next.orders.find((o) => o.id === id) ?? null);
+      },
+    );
   }
   function createAccount(form: FormData) {
     const input = {
@@ -427,39 +447,19 @@ export function Workspace({
   }
 
   function createSale(form: FormData) {
-    const product = data.products.find((p) => p.id === form.get("product"));
-    const quantity = Number(form.get("quantity"));
-    const price = Number(form.get("price"));
-    if (
-      !product ||
-      !Number.isSafeInteger(quantity) ||
-      quantity < 1 ||
-      quantity > product.stock - product.reserve ||
-      !Number.isSafeInteger(price) ||
-      price <= 0
-    ) {
-      setFormError(
-        "Enter whole pairs within available retail stock and a positive whole-MMK price.",
-      );
-      return;
-    }
-    const sale = {
-      id: `RS-${Date.now().toString().slice(-6)}`,
-      branchId: viewer.branchId ?? "b1",
-      description: `${product.name} · ${product.pack}`,
-      packs: quantity,
-      amount: quantity * price,
-      date: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Yangon" }),
-    };
-    update({
-      ...data,
-      retailSales: [sale, ...data.retailSales],
-      products: data.products.map((p) =>
-        p.id === product.id ? { ...p, stock: p.stock - quantity } : p,
-      ),
-    });
-    setModal(null);
-    setToast("Demo sale recorded and available stock updated.");
+    mutate(
+      "retail",
+      {
+        items: [
+          {
+            productId: String(form.get("product")),
+            quantity: Number(form.get("quantity")),
+            price: Number(form.get("price")),
+          },
+        ],
+      },
+      () => setModal(null),
+    );
   }
 
   const orderTable = (limit?: number) => (
@@ -557,12 +557,12 @@ export function Workspace({
           <div>
             <strong>{b.name}</strong>
             <span>
-              {demo
+              {role === "hq"
                 ? `${money(data.retailSales.filter((s) => s.branchId === b.id).reduce((s, x) => s + x.amount, 0))} MMK in retail sales`
                 : b.address}
             </span>
           </div>
-          {demo && role === "hq" && (
+          {role === "hq" && (
             <span
               className={`health-dot ${b.lowStock ? "warning" : ""}`}
               title={
@@ -579,7 +579,7 @@ export function Workspace({
         <span>
           {demo
             ? "Wholesale reserves stay protected."
-            : "Stock health connects in the next phase."}
+            : "Wholesale reserves stay protected."}
         </span>
       </div>
     </section>
@@ -816,14 +816,12 @@ export function Workspace({
                 <>
                   <span className="date-pill">
                     <Icon icon={CalendarDays} size={16} />
-                    {demo
-                      ? "20 Oct 2026"
-                      : new Date().toLocaleDateString("en-GB", {
-                          timeZone: "Asia/Yangon",
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                    {new Date().toLocaleDateString("en-GB", {
+                      timeZone: "Asia/Yangon",
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
                   </span>
                   {role === "hq" && (
                     <button
@@ -955,7 +953,7 @@ export function Workspace({
                         unit: "MMK",
                         note: "Retail + completed wholesale",
                         icon: Wallet,
-                        detail: "This month",
+                        detail: "Recorded history",
                       },
                       {
                         label: "Wholesale orders",
@@ -1030,7 +1028,7 @@ export function Workspace({
                             unit: "MMK",
                             note: "Recorded merchandise sales",
                             icon: Wallet,
-                            detail: "This month",
+                            detail: "Recorded history",
                           },
                           {
                             label: "Transactions",
@@ -1255,7 +1253,7 @@ export function Workspace({
                         <Icon icon={ShieldCheck} size={28} />
                         <p>
                           {role === "driver"
-                            ? "Keep the delivery page in the foreground for location sharing. Handovers and receipt confirmation are separate steps."
+                            ? "Review the receiver details before you set off. Report handover here; SME receipt is a separate confirmation. GPS sharing is not connected yet."
                             : "Retail availability excludes protected wholesale pairs. Backup deliveries need HQ approval and branch acceptance."}
                         </p>
                       </div>
@@ -1360,7 +1358,6 @@ export function Workspace({
               {orderTable()}
               <div className="table-footer">
                 {matchedOrders.length} matching orders{" "}
-                {!demo && "· Latest 100 records"}
               </div>
             </section>
           )}
@@ -1380,7 +1377,9 @@ export function Workspace({
                 {section === "catalog" && (
                   <button
                     className="button primary"
-                    disabled={!cart.length || !demo}
+                    disabled={
+                      !cart.length || data.settings?.shipping == null || pending
+                    }
                     onClick={() => open("order")}
                   >
                     <ShoppingBag size={17} />
@@ -1393,11 +1392,18 @@ export function Workspace({
                 <strong>STT exclusive supplier</strong>
                 <span>One shoe model · Sizes 38–40 · White & black</span>
               </div>
-              {!demo && (
+              {section === "catalog" && data.settings?.shipping == null && (
                 <div className="inline-note">
-                  Live catalog browsing is connected. Order submission and stock
-                  mutations are part of the next implementation phase.
+                  HQ must configure shipping and receiving-account instructions
+                  before orders can be quoted.
                 </div>
+              )}
+              {role === "hq" && section === "inventory" && (
+                <WorkflowAdmin
+                  data={data}
+                  mode="inventory"
+                  updated={applySnapshot}
+                />
               )}
               {section === "inventory" ? (
                 <section className="panel">
@@ -1479,7 +1485,7 @@ export function Workspace({
                       <Users size={16} />
                       Managed by {b.manager || "Branch team"}
                     </p>
-                    {role === "hq" && demo && (
+                    {role === "hq" && (
                       <div className="location-stats">
                         <span>
                           <small>Retail sales</small>
@@ -1629,14 +1635,6 @@ export function Workspace({
                   Business time: Yangon
                 </span>
               </section>
-              {!demo && (
-                <div className="inline-note">
-                  Live reporting is a schema preview. Retail ledgers, returns
-                  and full-history aggregation must be connected before these
-                  totals are used operationally. This preview includes only the
-                  latest 100 order records.
-                </div>
-              )}
               <div className="stats-grid report-stats">
                 {[
                   {
@@ -1707,33 +1705,31 @@ export function Workspace({
                       </tr>
                     </thead>
                     <tbody>
-                      {reportChannel !== "Retail" &&
-                        reportOrders
-                          .filter((o) => o.status === "Done")
-                          .map((o) => (
-                            <tr key={o.id}>
-                              <td>
-                                <button
-                                  className="text-link"
-                                  onClick={() => setSelected(o)}
-                                >
-                                  {o.reference}
-                                </button>
-                              </td>
-                              <td>Wholesale</td>
-                              <td>{o.salesDate ?? o.date}</td>
-                              <td>{money(o.merchandise)} MMK</td>
-                            </tr>
-                          ))}
-                      {reportChannel !== "Wholesale" &&
-                        reportSales.map((s) => (
-                          <tr key={s.id}>
-                            <td>{s.id}</td>
-                            <td>Retail</td>
-                            <td>{s.date}</td>
-                            <td>{money(s.amount)} MMK</td>
-                          </tr>
-                        ))}
+                      {reportEvents.map((e) => (
+                        <tr key={e.id}>
+                          <td>
+                            {e.orderId ? (
+                              <button
+                                className="text-link"
+                                onClick={() =>
+                                  setSelected(
+                                    data.orders.find(
+                                      (o) => o.id === e.orderId,
+                                    ) ?? null,
+                                  )
+                                }
+                              >
+                                {e.reference}
+                              </button>
+                            ) : (
+                              e.reference
+                            )}
+                          </td>
+                          <td>{e.channel}</td>
+                          <td>{e.date}</td>
+                          <td>{money(e.amount)} MMK</td>
+                        </tr>
+                      ))}
                     </tbody>
                     <tfoot>
                       <tr>
@@ -1824,7 +1820,7 @@ export function Workspace({
                   text={
                     demo
                       ? "Your next assigned delivery will appear here."
-                      : "Driver assignments and location sharing connect in the next phase."
+                      : "HQ assigns deliveries here after payment and stock confirmation."
                   }
                 />
               )}
@@ -1833,6 +1829,13 @@ export function Workspace({
           {section === "help" && <Guide />}
           {section === "settings" && (
             <div className="settings-grid">
+              {role === "hq" && (
+                <WorkflowAdmin
+                  data={data}
+                  mode="settings"
+                  updated={applySnapshot}
+                />
+              )}
               <section className="panel">
                 <div className="panel-heading">
                   <h2>Your account</h2>
@@ -1888,16 +1891,10 @@ export function Workspace({
                         <Link href="/driver/login">Driver sign in</Link>
                         <Link href="/hq/login">HQ sign in</Link>
                       </div>
-                      <button
-                        className="button secondary"
-                        onClick={() => {
-                          sessionStorage.removeItem(storageKey);
-                          setData(initialData);
-                          setToast("This portal’s demo data has been reset.");
-                        }}
-                      >
-                        Reset demo changes
-                      </button>
+                      <p className="muted">
+                        Orders and stock persist in the local demo database.
+                        Demo login credentials reset when this server restarts.
+                      </p>
                     </>
                   ) : (
                     <p>
@@ -1917,9 +1914,7 @@ export function Workspace({
               STT shoes. Stronger connections.
             </span>
             <span>
-              {demo
-                ? "Interactive baseline · Sample data"
-                : "SupplyLink workspace"}
+              {demo ? "Local demo · Saved workflow" : "SupplyLink workspace"}
               <span className="footer-dot" />
               Yangon, Myanmar
             </span>
@@ -2116,83 +2111,13 @@ export function Workspace({
       )}
       {selected && (
         <Modal title={selected.reference} close={() => setSelected(null)}>
-          <div className="modal-form">
-            <div className="order-detail-heading">
-              <span className="avatar">{selected.initials}</span>
-              <div>
-                <h3>{selected.business}</h3>
-                <span className="muted">{selected.location}</span>
-              </div>
-              <Badge status={selected.status} />
-            </div>
-            <dl className="detail-list">
-              {role !== "driver" && (
-                <>
-                  <div>
-                    <dt>Merchandise</dt>
-                    <dd>{money(selected.merchandise)} MMK</dd>
-                  </div>
-                  <div>
-                    <dt>Shipping</dt>
-                    <dd>{money(selected.shipping)} MMK</dd>
-                  </div>
-                  <div className="total-row">
-                    <dt>Full order total</dt>
-                    <dd>{money(total(selected))} MMK</dd>
-                  </div>
-                </>
-              )}
-              <div>
-                <dt>Fulfilment source</dt>
-                <dd>{selected.source}</dd>
-              </div>
-              <div>
-                <dt>Ordered pairs</dt>
-                <dd>{selected.items}</dd>
-              </div>
-            </dl>
-            <div className="detail-status">
-              <Icon
-                icon={
-                  selected.status === "Done"
-                    ? CheckCheck
-                    : selected.status === "On hold"
-                      ? CircleHelp
-                      : Clock3
-                }
-                size={23}
-              />
-              <div>
-                <strong>
-                  {selected.status === "Awaiting verification"
-                    ? "Full payment needs verification"
-                    : selected.status === "Done"
-                      ? "Both sides confirmed completion"
-                      : selected.status === "Complete"
-                        ? "Awaiting SME receipt"
-                        : selected.status === "On hold"
-                          ? "HQ must resolve the delivery issue"
-                          : selected.status === "Draft"
-                            ? "Draft saved, not submitted"
-                            : `Order is ${selected.status.toLowerCase()}`}
-                </strong>
-                <p>
-                  {selected.status === "Awaiting verification"
-                    ? "Verify the actual transfer covers the full total and reserve stock before confirming."
-                    : selected.status === "Done"
-                      ? "Headquarters completion, SME receipt and issue resolution are required for Done."
-                      : selected.status === "On hold"
-                        ? "Resolve the original shipment before arranging a replacement."
-                        : "Use the recorded workflow to progress this order. GPS does not confirm receipt."}
-                </p>
-              </div>
-            </div>
-            <div className="inline-note">
-              {demo
-                ? "This is a sample order. Payment review, receipt actions and fulfilment mutations are not connected in this baseline."
-                : "Order mutations and payment evidence are next-phase features. This view reads the stored record."}
-            </div>
-          </div>
+          <OrderWorkflow
+            key={selected.id}
+            order={selected}
+            viewer={viewer}
+            accounts={data.accounts}
+            updated={applySnapshot}
+          />
         </Modal>
       )}
       {modal === "notifications" && (
@@ -2248,7 +2173,7 @@ export function Workspace({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              createDemoOrder(new FormData(e.currentTarget));
+              createOrder(new FormData(e.currentTarget));
             }}
             className="modal-form"
           >
@@ -2269,17 +2194,31 @@ export function Workspace({
                 <dd>{money(subtotal)} MMK</dd>
               </div>
               <div>
-                <dt>Demo shipping quote</dt>
-                <dd>5,000 MMK</dd>
+                <dt>Yangon shipping quote</dt>
+                <dd>
+                  {data.settings?.shipping == null
+                    ? "Awaiting HQ setup"
+                    : `${money(data.settings.shipping)} MMK`}
+                </dd>
               </div>
               <div className="total-row">
                 <dt>Full total due upfront</dt>
-                <dd>{money(subtotal + 5000)} MMK</dd>
+                <dd>{money(subtotal + (data.settings?.shipping ?? 0))} MMK</dd>
               </div>
             </dl>
             <label className="field">
               Receiver name
               <input name="receiver" required defaultValue={viewer.name} />
+            </label>
+            <label className="field">
+              Receiver phone
+              <input
+                name="phone"
+                type="tel"
+                minLength={6}
+                maxLength={30}
+                required
+              />
             </label>
             <label className="field">
               Delivery address
@@ -2291,16 +2230,16 @@ export function Workspace({
               />
             </label>
             <div className="inline-note">
-              Save a demo draft. Full payment evidence and HQ review will be
-              connected in the next phase.
+              Save this quote, then submit full-payment evidence. Stock is
+              reserved only after HQ verifies the actual transfer.
             </div>
             {formError && (
               <p role="alert" className="form-error">
                 {formError}
               </p>
             )}
-            <button className="button primary full-width" disabled={!demo}>
-              Save draft order
+            <button className="button primary full-width" disabled={pending}>
+              {pending ? "Saving…" : "Save quote & continue"}
             </button>
           </form>
         </Modal>
@@ -2315,16 +2254,15 @@ export function Workspace({
             className="modal-form"
           >
             <p className="muted">
-              {demo
-                ? "This records a demo sale and reduces retail stock in this browser session."
-                : "Live retail mutations will be connected in the next phase."}
+              Post the actual merchandise sale and reduce available branch stock
+              in one transaction.
             </p>
             <label className="field">
               Product
               <select name="product">
                 {data.products.map((p) => (
                   <option value={p.id} key={p.id}>
-                    {p.name} · {p.stock - p.reserve} retail pairs available
+                    {p.pack} · {p.stock - p.reserve} retail pairs available
                   </option>
                 ))}
               </select>
@@ -2361,7 +2299,7 @@ export function Workspace({
                 {formError}
               </p>
             )}
-            <button className="button primary full-width" disabled={!demo}>
+            <button className="button primary full-width" disabled={pending}>
               Record sale
             </button>
           </form>

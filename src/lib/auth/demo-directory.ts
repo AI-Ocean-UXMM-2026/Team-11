@@ -72,6 +72,9 @@ export class DemoDirectory {
         affiliation: u.affiliation,
       }));
   }
+  workflowUsers(): DemoUser[] {
+    return [...this.users.values()].map(publicUser);
+  }
   authenticate(
     portal: Role,
     username: string,

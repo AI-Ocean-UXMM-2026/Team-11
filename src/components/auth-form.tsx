@@ -161,7 +161,6 @@ function PortalLoginForm({
       )}
       <div className="portal-links">
         <Link href="/login">Choose another portal</Link>
-        {demo && portal === "hq" && <Link href="/">Preview HQ dashboard</Link>}
       </div>
     </form>
   );

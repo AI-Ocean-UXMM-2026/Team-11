@@ -1,7 +1,6 @@
 # Connect Supabase
 
-This is an application baseline, not the completed PRD. Local demo actions are labelled
-and stored in browser session storage. They never write real accounts, payments or locations.
+Phase 2 adds the saved ordering and delivery workflow. Local orders and stock use a private PGlite database in `.data/`; demo accounts and sessions remain in server memory. See [the workflow guide](order-workflow.md). A hosted Supabase project is not configured yet.
 
 ## 1. Environment
 
@@ -14,15 +13,15 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVER_ONLY_KEY
 ```
 
-The service role key is server-only and used solely by the authorised HQ provisioning action.
+The service role key is server-only and used for authorised HQ account provisioning and validated private proof uploads.
 Do not commit `.env.local`. In production, no missing configuration silently enables demo mode.
 To host an intentional demo, explicitly set `NEXT_PUBLIC_DEMO_MODE=true`.
 
 ## 2. Database
 
-Apply `supabase/migrations/202610200001_baseline.sql` followed by `202610200002_stt_catalog.sql` in a fresh Supabase SQL editor,
+Apply `supabase/migrations/202610200001_baseline.sql` followed by `202610200002_stt_catalog.sql` then `202610210003_order_workflow.sql` and `202610210004_order_history.sql` in a fresh Supabase SQL editor,
 or apply it with your usual Supabase CLI migration workflow. Optional `supabase/seed.sql`
-adds sample branch and catalog rows, not user accounts. Disable **Allow new users to sign up**
+adds sample branches, not user accounts. Branch stock starts empty on hosted Supabase; HQ must enter actual counts. Configure shipping and receiving-account instructions in HQ Settings before creating orders. Disable **Allow new users to sign up**
 in Supabase Authentication settings. All SME and Driver provisioning must go through HQ.
 
 Tables have RLS enabled and authenticated users have SELECT grants only. Policy helpers read
@@ -61,24 +60,18 @@ email-reset flow because these account IDs do not use deliverable email addresse
 - HQ-only account creation via Auth Admin API, profile insert and audit event.
 - Secure first-login password change and sign-out.
 
-## Next implementation slices
+## Phase 2 operations
 
-1. Transactional quote, immutable order lines, full-payment proof byte validation/versioning,
-   actual-transfer verification, atomic inventory reservation and retry-safe state changes.
-2. Retail line ledger, returns/adjustments, atomic reserve-aware sales, Done events and reports
-   by actual event time in Asia/Yangon. The current live report explicitly labels itself as a
-   preview: completion timestamps are respected, but the 100-order window and missing retail
-   and return integration do not fulfil historical reporting acceptance.
-3. Driver delivery DTO with only necessary receiver fields, assignment, opt-in foreground
-   location publishing, freshness/retention controls and branch replacement transactions.
-4. HQ reset/suspension with session revocation, creation idempotency, cleanup reconciliation,
-   account lifecycle audit hardening and end-to-end access tests against a real Supabase instance.
+The `workflow_execute` RPC validates ownership, role, first-login state and status, and performs stock/payment/delivery transitions in a transaction. `workflow_snapshot` returns scoped portal data. Private proof images pass server byte validation before the server-only storage upload. Authenticated users have no direct Storage write policies. Driver DTOs exclude payment evidence and monetary values. See [workflow and API](order-workflow.md).
 
-No live driver data is fetched by this baseline. Drivers must never receive whole order rows
-because those include payment amounts. Live inventory quantities are catalog snapshots until
-updated through the future transactional inventory ledger. The stock screen reads HQ or the
-assigned branch inventory under RLS. No payment upload, GPS, financial transfer or fulfilment
-action is simulated as a live success. The app is not ready for live trading.
+## Remaining implementation slices
+
+1. Hosted Supabase smoke test with real Auth/Storage; schema/RPC/RLS and storage advisor review.
+2. Returns/reversals, physical return acceptance, refund accounting, and paginated history/reporting.
+3. Opt-in foreground GPS publishing, freshness/retention controls and branch replacement transactions.
+4. HQ reset/suspension, session revocation and account creation reconciliation.
+
+No real payment, refund or location collection is performed by the app. Do not use local demo credentials for hosted operations.
 
 Official integration references: [Supabase SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client?queryGroups=framework&framework=nextjs),
 [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security),

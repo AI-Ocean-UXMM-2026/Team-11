@@ -31,6 +31,39 @@ export interface Order {
   date: string;
   salesDate?: string;
   source: string;
+  workflow?: {
+    receiver: string;
+    phone: string;
+    notes: string;
+    paymentVerified: boolean;
+    reserved: boolean;
+    hqComplete: boolean;
+    received: boolean;
+    issue: string | null;
+    refundRequired: boolean;
+    instructions: string;
+    driverId: string | null;
+    driverName: string | null;
+    handover: boolean;
+    lines: {
+      productId: string;
+      name: string;
+      variant: string;
+      quantity: number;
+      unitPrice?: number;
+    }[];
+    evidence: {
+      id: string;
+      version: number;
+      amount: number;
+      verifiedAmount: number | null;
+      reference: string;
+      status: string;
+      reason: string | null;
+      createdAt: string;
+    }[];
+    events: { action: string; reason: string; at: string; actor: string }[];
+  };
 }
 export interface Product {
   id: string;
@@ -77,6 +110,18 @@ export interface WorkspaceData {
   branches: Branch[];
   accounts: Account[];
   retailSales: RetailSale[];
+  settings?: { shipping: number | null; instructions: string; area: string };
+  workflowEnabled?: boolean;
+  salesEvents?: {
+    id: string;
+    reference: string;
+    orderId?: string;
+    channel: string;
+    amount: number;
+    units: number;
+    branchId?: string;
+    date: string;
+  }[];
 }
 export interface Viewer {
   id: string;

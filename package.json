@@ -8,10 +8,12 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "smoke:workflow": "node scripts/workflow-smoke.mjs",
     "format": "prettier --write src tests docs package.json tsconfig.json next.config.ts",
     "format:check": "prettier --check src tests docs package.json tsconfig.json next.config.ts"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@fontsource/manrope": "^5.2.8",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.0.0",
@@ -20,10 +22,10 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "server-only": "^0.0.1",
+    "sharp": "^0.35.5",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.10",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

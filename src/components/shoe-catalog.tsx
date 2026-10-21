@@ -115,7 +115,7 @@ export function ShoeCatalog({
             <button
               type="button"
               aria-label="Add selected shoe variant"
-              disabled={!demo || quantity + product.minimum > product.stock}
+              disabled={quantity + product.minimum > product.stock}
               onClick={() =>
                 change({ ...basket, [product.id]: quantity + product.minimum })
               }
