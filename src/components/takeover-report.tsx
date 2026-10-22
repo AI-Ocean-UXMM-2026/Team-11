@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ClipboardList } from "lucide-react";
 import type { Viewer } from "@/lib/domain";
 import type { TakeoverReportPage } from "@/lib/stock-planning";
+import { statusToneClass } from "@/lib/status-tone";
 
 async function readTakeovers(page: number, signal?: AbortSignal) {
   const response = await fetch(
@@ -51,15 +52,22 @@ export function TakeoverReport({
           </p>
         </div>
         <span className="muted">
-          {query.data ? `${query.data.total.toLocaleString()} records` : "All branches"}
+          {query.data
+            ? `${query.data.total.toLocaleString()} records`
+            : "All branches"}
         </span>
       </div>
       {query.isPending ? (
-        <p className="info-pad" role="status">Loading takeover history…</p>
+        <p className="info-pad" role="status">
+          Loading takeover history…
+        </p>
       ) : query.isError ? (
         <div className="info-pad" role="alert">
           <p>Takeover history could not load. {query.error.message}</p>
-          <button className="button secondary" onClick={() => void query.refetch()}>
+          <button
+            className="button secondary"
+            onClick={() => void query.refetch()}
+          >
             Retry
           </button>
         </div>
@@ -84,14 +92,25 @@ export function TakeoverReport({
                   <tr key={`${row.id}:${row.productId}`}>
                     <td>{date(row.at)}</td>
                     <td>
-                      <button className="text-link" onClick={() => void openOrder(row.orderId)}>
+                      <button
+                        className="text-link"
+                        onClick={() => void openOrder(row.orderId)}
+                      >
                         {row.reference}
                       </button>
                     </td>
                     <td>{row.branchName}</td>
                     <td>{row.variant}</td>
-                    <td>{row.quantity.toLocaleString()} {row.unit}</td>
-                    <td><span className="backup-status unset">{row.status}</span></td>
+                    <td>
+                      {row.quantity.toLocaleString()} {row.unit}
+                    </td>
+                    <td>
+                      <span
+                        className={`backup-status ${statusToneClass(row.status)}`}
+                      >
+                        {row.status}
+                      </span>
+                    </td>
                     <td>{row.reason}</td>
                     <td>{row.actor}</td>
                   </tr>
@@ -100,22 +119,50 @@ export function TakeoverReport({
             </table>
           </div>
           <div className="takeover-report-footer">
-            <span>Page {query.data.page} of {Math.max(1, Math.ceil(query.data.total / query.data.pageSize))}</span>
+            <span>
+              Page {query.data.page} of{" "}
+              {Math.max(1, Math.ceil(query.data.total / query.data.pageSize))}
+            </span>
             <div>
-              <button className="button secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button>
-              <button className="button secondary" disabled={page * query.data.pageSize >= query.data.total} onClick={() => setPage((value) => value + 1)}>Next</button>
+              <button
+                className="button secondary"
+                disabled={page <= 1}
+                onClick={() => setPage((value) => value - 1)}
+              >
+                Previous
+              </button>
+              <button
+                className="button secondary"
+                disabled={page * query.data.pageSize >= query.data.total}
+                onClick={() => setPage((value) => value + 1)}
+              >
+                Next
+              </button>
             </div>
           </div>
           <details className="takeover-report-audit">
-            <summary><ClipboardList size={16} aria-hidden="true" /> Show audit trail for this page</summary>
+            <summary>
+              <ClipboardList size={16} aria-hidden="true" /> Show audit trail
+              for this page
+            </summary>
             {query.data.rows.map((row) => (
               <article key={`${row.id}:${row.productId}`}>
-                <strong>{row.reference} · {row.branchName} · {row.variant}</strong>
+                <strong>
+                  {row.reference} · {row.branchName} · {row.variant}
+                </strong>
                 <p>Original consignment: {row.resolution}</p>
-                <p>Deadline: {date(row.deadline)} · Fulfilled: {date(row.fulfilledAt)}</p>
-                {row.responseReason && <p>Branch response: {row.responseReason}</p>}
+                <p>
+                  Deadline: {date(row.deadline)} · Fulfilled:{" "}
+                  {date(row.fulfilledAt)}
+                </p>
+                {row.responseReason && (
+                  <p>Branch response: {row.responseReason}</p>
+                )}
                 {row.events.map((event, index) => (
-                  <p key={`${row.id}:${index}`}>{event.action} · {event.actor} · {date(event.at)}{event.reason && ` · ${event.reason}`}</p>
+                  <p key={`${row.id}:${index}`}>
+                    {event.action} · {event.actor} · {date(event.at)}
+                    {event.reason && ` · ${event.reason}`}
+                  </p>
                 ))}
               </article>
             ))}

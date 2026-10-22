@@ -48,7 +48,7 @@ beforeAll(async () => {
     [branch, product],
   );
   await db.query(
-    "insert into public.orders(id,reference,sme_id,business_name,destination,receiver_name,receiver_phone,item_count,merchandise_total,shipping_total) values($1,'STT-existing',$2,'Shop','Yangon','Receiver','09123456789',1,100,0)",
+    "insert into public.orders(id,reference,sme_id,business_name,destination,receiver_name,receiver_phone,item_count,merchandise_total,shipping_total) values($1,'OPL-existing',$2,'Shop','Yangon','Receiver','09123456789',1,100,0)",
     [existingOrder, buyer],
   );
 });
@@ -99,7 +99,7 @@ it("seeds sufficient dated takeover/refill evidence without changing balances, s
         existingOrder,
       ])
     ).rows[0],
-  ).toEqual({ reference: "STT-existing", status: "Draft" });
+  ).toEqual({ reference: "OPL-existing", status: "Draft" });
   const counts = async () =>
     (
       await db.query(

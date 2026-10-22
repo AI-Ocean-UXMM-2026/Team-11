@@ -56,7 +56,7 @@ async function fixture() {
     const id = randomUUID();
     await db.query(
       "insert into public.orders(id,reference,sme_id,business_name,destination,receiver_name,receiver_phone,item_count,merchandise_total,shipping_total,status,payment_verified_at,reserved_at,latitude,longitude) values($1,$2,$3,'Phase shop','Yangon','Receiver','+959123456789',$4,$5,5000,'Confirmed',now(),now(),16.84,96.13)",
-      [id, `STT-${id}`, sme, qty, qty * 45000],
+      [id, `OPL-${id}`, sme, qty, qty * 45000],
     );
     await db.query(
       "insert into public.order_lines(order_id,product_id,product_name,pack_snapshot,quantity,unit_price) select $1,id,name,pack,$3,45000 from public.products where id=$2",
@@ -245,6 +245,110 @@ it("delivers 40 of 60 from a branch, retains Order remaining throughout phase 2 
   expect(await stock(f.b)).toMatchObject({ on_hand: 0, allocated: 0 });
   expect((await stock(null)).on_hand).toBe(before.on_hand - 20);
   expect((await stock(null)).allocated).toBe(before.allocated - 60);
+});
+
+it("splits a returned HQ consignment into a 40-pair branch phase and a 20-pair HQ phase", async () => {
+  const f = await fixture(),
+    o = await f.order();
+  const before = await stock(null);
+
+  await prepare(hq, o, f.hqDriver);
+  await db.query(
+    "update public.orders set status='On hold',has_open_issue=true,issue_reason='HQ delivery delayed' where id=$1",
+    [o],
+  );
+  await run(hq, "route_branch", {
+    orderId: o,
+    branchId: f.b,
+    reason: "HQ driver unavailable; route available pairs through the branch.",
+    originalResolution: "returned_to_hq",
+    consignmentResolved: true,
+    receivedBack: true,
+  });
+  const oldRequest = (
+    await db.query<{ id: string }>(
+      "select id from public.delivery_handoffs where order_id=$1 and status='pending'",
+      [o],
+    )
+  ).rows[0].id;
+  await run(hq, "handoff_cancel", {
+    orderId: o,
+    handoffId: oldRequest,
+    reason: "Convert the full-order request to a stock-sized phase.",
+  });
+
+  const branchPhase = await request(o, f.b, 40);
+  expect((await stock(null)).allocated).toBe(before.allocated);
+  await run(f.staff, "handoff_accept", {
+    orderId: o,
+    handoffId: branchPhase.handoff_id,
+  });
+  await prepare(f.staff, o, f.driver);
+  await run(f.driver, "pickup", { orderId: o });
+  await run(f.driver, "handover", { orderId: o, phaseId: branchPhase.id });
+  await run(f.sme, "receive", {
+    orderId: o,
+    phaseId: branchPhase.id,
+    fullReceipt: true,
+  });
+  expect((await snap(f.sme, o)).workflow!.fulfilment).toMatchObject({
+    ordered: 60,
+    received: 40,
+    remaining: 20,
+    current: null,
+  });
+
+  const hqPhase = await request(o, null, 20);
+  await prepare(hq, o, f.hqDriver);
+  await run(f.hqDriver, "pickup", { orderId: o });
+  await run(f.hqDriver, "handover", { orderId: o, phaseId: hqPhase.id });
+  await run(f.sme, "receive", {
+    orderId: o,
+    phaseId: hqPhase.id,
+    fullReceipt: true,
+  });
+
+  expect((await snap(f.sme, o)).status).toBe("Done");
+  expect((await stock(null)).on_hand).toBe(before.on_hand - 20);
+  expect((await stock(null)).allocated).toBe(before.allocated - 60);
+  expect((await stock(f.b)).on_hand).toBe(0);
+  expect(
+    (await db.query("select * from public.sales_events where order_id=$1", [o]))
+      .rows,
+  ).toHaveLength(1);
+});
+
+it("can start a stock-sized phase directly from a held dispatched order after HQ confirms return", async () => {
+  const f = await fixture(),
+    o = await f.order();
+  const before = await stock(null);
+  await prepare(hq, o, f.hqDriver);
+  await db.query(
+    "update public.orders set status='On hold',has_open_issue=true,issue_reason='HQ delivery delayed' where id=$1",
+    [o],
+  );
+
+  const p = await run(hq, "phase_request", {
+    orderId: o,
+    branchId: f.b,
+    lines: [{ productId: product, quantity: 40 }],
+    reason: "Branch delivers available backup first.",
+    returnedConsignmentConfirmed: true,
+  });
+  expect((await stock(null)).on_hand).toBe(before.on_hand);
+  expect((await stock(null)).allocated).toBe(before.allocated);
+  const activePhase = await phase(o);
+  expect(activePhase).toMatchObject({
+    state: "requested",
+    source_branch_id: f.b,
+  });
+  expect(p.message).toContain("Waiting for branch acceptance");
+  await run(f.staff, "handoff_accept", {
+    orderId: o,
+    handoffId: activePhase.handoff_id,
+  });
+  expect((await stock(null)).allocated).toBe(before.allocated - 40);
+  expect(await stock(f.b)).toMatchObject({ on_hand: 40, allocated: 40 });
 });
 
 it("records SME receipt first but waits for phase handover and cannot overfill or use retail stock", async () => {

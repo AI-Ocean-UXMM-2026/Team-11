@@ -44,6 +44,15 @@ beforeAll(async () => {
   await db.exec(
     await readFile("supabase/migrations/202610200002_stt_catalog.sql", "utf8"),
   );
+  await db.exec(
+    "alter table public.profiles add column latitude double precision, add column longitude double precision",
+  );
+  await db.exec(
+    await readFile(
+      "supabase/migrations/20261023030000_sme_saved_delivery_location.sql",
+      "utf8",
+    ),
+  );
   await db.exec(await readFile("supabase/seed.sql", "utf8"));
   for (const [name, id] of Object.entries(ids)) {
     await db.query("insert into auth.users values ($1,'initial-hash')", [id]);
@@ -102,6 +111,42 @@ afterAll(async () => {
 });
 
 describe("baseline migration and RLS", () => {
+  it("lets an SME update only its own delivery address and map pin", async () => {
+    await asUser(ids.sme, async () => {
+      const { rows } = await db.query(
+        "update public.profiles set address='12 Hlaing Road, Yangon',latitude=16.84,longitude=96.17 where id=$1 returning address,latitude,longitude",
+        [ids.sme],
+      );
+      expect(rows).toEqual([
+        {
+          address: "12 Hlaing Road, Yangon",
+          latitude: 16.84,
+          longitude: 96.17,
+        },
+      ]);
+      expect(
+        (
+          await db.query(
+            "update public.profiles set address='Another shop' where id=$1 returning id",
+            [ids.other],
+          )
+        ).rows,
+      ).toHaveLength(0);
+      await expect(
+        db.query("update public.profiles set role='hq' where id=$1", [ids.sme]),
+      ).rejects.toThrow();
+    });
+    await asUser(ids.hq, async () => {
+      expect(
+        (
+          await db.query(
+            "update public.profiles set address='HQ changed this' where id=$1 returning id",
+            [ids.sme],
+          )
+        ).rows,
+      ).toHaveLength(0);
+    });
+  });
   it("applies migration and seed in Postgres", async () => {
     const result = await db.query<{ count: number }>(
       "select count(*)::int as count from public.products",

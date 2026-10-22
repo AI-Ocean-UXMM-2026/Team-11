@@ -184,17 +184,34 @@ export function DeliveryTracking({
         <p className="tracking-legend">
           {data.point && (
             <span>
-              Blue: {live ? "driver" : "driver’s last known position"}
+              <i className="tracking-legend-dot driver" aria-hidden="true" />
+              {live ? "Driver" : "Driver’s last known position"}
             </span>
           )}
-          {data.destination && <span>Green: destination</span>}
+          {data.destination && (
+            <span>
+              <i
+                className="tracking-legend-dot destination"
+                aria-hidden="true"
+              />
+              Destination
+            </span>
+          )}
           {data.run?.stops.some((stop) => !stop.own) && (
             <span>
-              Amber:{" "}
+              <i
+                className="tracking-legend-dot other-stop"
+                aria-hidden="true"
+              />
               {viewer.role === "sme" ? "earlier stops" : "other drop-offs"}
             </span>
           )}
-          {data.source.pin && <span>Grey: dispatch source</span>}
+          {data.source.pin && (
+            <span>
+              <i className="tracking-legend-dot dispatch" aria-hidden="true" />
+              Dispatch source
+            </span>
+          )}
         </p>
       )}
       {data.point && (

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from "react";
+import { act, useState, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { LocationPicker } from "../src/components/location-picker";
@@ -70,10 +70,11 @@ vi.mock("mapbox-gl", () => {
   }
   class Marker {
     handlers: Record<string, () => void> = {};
-    element = document.createElement("div");
+    element: HTMLElement;
     point: number[] = [];
     remove = vi.fn(() => this.element.remove());
     constructor(public options: any) {
+      this.element = options.element ?? document.createElement("div");
       sdk.markers.push(this);
     }
     getElement() {
@@ -176,6 +177,54 @@ it("saves map clicks and marker drags in the existing form contract, including z
   expect(host.querySelectorAll('input:not([type="hidden"])')).toHaveLength(0);
 });
 
+it("fills a linked address field from the selected map pin", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL) => {
+      expect(String(input)).toContain("longitude=96.17");
+      expect(String(input)).toContain("latitude=16.84");
+      return {
+        ok: true,
+        json: async () => ({
+          features: [
+            { properties: { full_address: "No. 10, Yangon, Myanmar" } },
+          ],
+        }),
+      };
+    }),
+  );
+  function AddressForm() {
+    const [address, setAddress] = useState("");
+    return (
+      <form>
+        <textarea
+          name="address"
+          value={address}
+          onChange={(event) => setAddress(event.target.value)}
+        />
+        <LocationPicker
+          label="Delivery location"
+          addressValue={address}
+          onAddressChange={setAddress}
+        />
+      </form>
+    );
+  }
+
+  await render(<AddressForm />);
+  await act(async () =>
+    sdk.maps[0].emit("click", { lngLat: { lat: 16.84, lng: 96.17 } }),
+  );
+
+  expect(
+    (host.querySelector('textarea[name="address"]') as HTMLTextAreaElement)
+      .value,
+  ).toBe("No. 10, Yangon, Myanmar");
+  expect(host.textContent).toContain(
+    "Address updated from the pinned location.",
+  );
+});
+
 it("keeps the map instance while changing a saved pin and cleans up when closed", async () => {
   await render(
     <LocationMap
@@ -236,11 +285,14 @@ it("frames driver and destination pins clear of map controls and keeps their lab
       ]}
     />,
   );
-  expect(sdk.markers[0].options.color).toBe("#2868b2");
+  expect(
+    sdk.markers[0].element.style.getPropertyValue("--location-marker-color"),
+  ).toBe("#2868b2");
   expect(
     sdk.markers.some(
       (m: any) =>
-        m.options.color === "#17674f" &&
+        m.element.style.getPropertyValue("--location-marker-color") ===
+          "#17674f" &&
         m.element.getAttribute("aria-label") === "Delivery destination",
     ),
   ).toBe(true);

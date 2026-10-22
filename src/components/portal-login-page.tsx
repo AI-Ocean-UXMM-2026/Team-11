@@ -4,7 +4,7 @@ import { isDemoMode } from "@/lib/supabase/config";
 import type { LoginPortal } from "@/lib/portals";
 export function PortalLoginPage({ portal }: { portal: LoginPortal }) {
   return (
-    <AuthLayout portal={portal}>
+    <AuthLayout>
       <AuthForm portal={portal} demo={isDemoMode()} />
     </AuthLayout>
   );

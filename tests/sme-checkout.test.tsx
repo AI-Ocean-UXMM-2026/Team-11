@@ -13,14 +13,18 @@ vi.mock("next/image", () => ({
   default: ({ sizes: _sizes, ...props }: any) => <img {...props} />,
 }));
 vi.mock("../src/components/location-picker", () => ({
-  LocationPicker: () => <span>Optional delivery pin</span>,
+  LocationPicker: ({ initialPin }: { initialPin?: unknown }) => (
+    <span data-initial-pin={JSON.stringify(initialPin ?? null)}>
+      Optional delivery pin
+    </span>
+  ),
 }));
 let host: HTMLDivElement, root: Root, data: WorkspaceData;
 const updated = vi.fn(async () => {}),
   viewOrder = vi.fn();
 const order = {
   id: "new-order",
-  reference: "STT-NEW-ORDER",
+  reference: "OPL-NEW-ORDER",
   business: "Mya Thida",
   status: "Draft",
   items: 2,
@@ -56,7 +60,7 @@ async function mount() {
   );
 }
 async function shopToReview() {
-  await click("Add to cart", host.querySelectorAll(".sneaker-card")[0]);
+  await click("Add to cart", host.querySelectorAll(".catalog-product-card")[0]);
   await click("View cart");
   await click("Confirm cart & order");
   const form = host.querySelector("form")!;
@@ -106,22 +110,43 @@ afterEach(async () => {
   host.remove();
   vi.unstubAllGlobals();
 });
-it("shows both color cards and reviews the selected size with a photo before ordering", async () => {
+it("shows the imported longyi styles and reviews a selected style before ordering", async () => {
   await mount();
-  expect(host.querySelectorAll(".sneaker-card")).toHaveLength(2);
-  const card = host.querySelector(".sneaker-card")!;
-  await click("39", card);
+  expect(host.querySelectorAll(".product-card")).toHaveLength(30);
+  const card = host.querySelector(".catalog-product-card")!;
+  expect(card.textContent).toContain("Premium Fine Fabric Longyi");
+  expect(card.textContent).toContain("Style 1.2");
   await click("Add to cart", card);
   await click("View cart");
   expect(
     host.querySelector(".checkout-cart-item img")?.getAttribute("alt"),
-  ).toContain("STT sneaker");
+  ).toContain("Premium Fine Fabric Longyi");
   expect(
     host.querySelector(".checkout-cart-description")?.textContent,
-  ).toContain("EU 39");
+  ).toContain("Style 1.2");
   expect(action).not.toHaveBeenCalled();
   await click("Remove");
   expect(host.textContent).toContain("Your cart is empty");
+});
+it("prefills order details from the SME's saved account location", async () => {
+  data.profile = {
+    phone: "+959123456789",
+    address: "12 Hlaing Road, Yangon",
+    pin: { latitude: 16.84, longitude: 96.17 },
+  };
+  await mount();
+  await click("Add to cart", host.querySelectorAll(".catalog-product-card")[0]);
+  await click("View cart");
+  await click("Confirm cart & order");
+  expect(
+    (host.querySelector('[name="address"]') as HTMLTextAreaElement).value,
+  ).toBe("12 Hlaing Road, Yangon");
+  expect(
+    (host.querySelector('[name="receiver"]') as HTMLInputElement).value,
+  ).toBe("Mya Thida");
+  expect(host.querySelector("[data-initial-pin]")?.getAttribute("data-initial-pin")).toBe(
+    JSON.stringify({ latitude: 16.84, longitude: 96.17 }),
+  );
 });
 it("preserves the retry key when order creation is interrupted and does not finish before evidence", async () => {
   await mount();

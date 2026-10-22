@@ -41,7 +41,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   snapshot = {
     orderId: "order",
-    reference: "STT-trip",
+    reference: "OPL-trip",
     status: "Shipping",
     attemptId: "attempt",
     driverId: "driver",
@@ -96,11 +96,11 @@ it("explains the missing driver pin before pickup and lets the driver hide/show 
     "Confirm pickup & start delivery and allow GPS access",
   );
   expect(host.querySelector(".tracking-legend")?.textContent).toBe(
-    "Green: destination",
+    "Destination",
   );
   expect(
     host.querySelector('[data-testid="map"]')?.getAttribute("data-color"),
-  ).toBe("#17674f");
+  ).toBe("#16834A");
   const details = host.querySelector("details")!;
   expect(details.open).toBe(true);
   await act(async () => details.querySelector("summary")!.click());
@@ -111,7 +111,7 @@ it("explains the missing driver pin before pickup and lets the driver hide/show 
   expect(transport.begin).not.toHaveBeenCalled();
   expect(transport.pause).not.toHaveBeenCalled();
 });
-it("renders the actual received driver fix in blue with destination and source markers", async () => {
+it("renders the driver, destination, and source with distinct map colors", async () => {
   snapshot.pickedUpAt = new Date().toISOString();
   snapshot.canPublish = true;
   snapshot.state = "sharing";
@@ -126,13 +126,13 @@ it("renders the actual received driver fix in blue with destination and source m
   await render();
   expect(host.textContent).toContain("Live driver location");
   const map = host.querySelector('[data-testid="map"]')!;
-  expect(map.getAttribute("data-color")).toBe("#2868b2");
+  expect(map.getAttribute("data-color")).toBe("#2563EB");
   expect(JSON.parse(map.getAttribute("data-pin")!)).toEqual(snapshot.point);
   expect(
     JSON.parse(map.getAttribute("data-markers")!).map((m: any) => m.id),
   ).toEqual(["source", "destination"]);
   expect(host.querySelector(".tracking-legend")?.textContent).toContain(
-    "Blue: driver",
+    "Driver",
   );
 });
 it("explains missing GPS after pickup and labels stale fixes as last known", async () => {
@@ -144,7 +144,7 @@ it("explains missing GPS after pickup and labels stale fixes as last known", asy
     "No driver GPS position has been received yet",
   );
   expect(host.querySelector(".tracking-legend")?.textContent).not.toContain(
-    "Blue:",
+    "Driver",
   );
   snapshot = {
     ...snapshot,
@@ -164,18 +164,18 @@ it("explains missing GPS after pickup and labels stale fixes as last known", asy
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
-    expect(host.textContent).toContain("driver’s last known position");
+    expect(host.textContent).toContain("Driver’s last known position");
   });
 });
-it("uses grey for a source-only map and keeps the existing HQ section", async () => {
+it("uses amber for a source-only map and keeps the existing HQ section", async () => {
   snapshot.destination = null;
   snapshot.source.pin = { latitude: 16.9, longitude: 96.2 };
   await render("hq");
   expect(host.querySelector("details")).toBeNull();
   expect(
     host.querySelector('[data-testid="map"]')?.getAttribute("data-color"),
-  ).toBe("#66756e");
+  ).toBe("#D97706");
   expect(host.querySelector(".tracking-legend")?.textContent).toBe(
-    "Grey: dispatch source",
+    "Dispatch source",
   );
 });

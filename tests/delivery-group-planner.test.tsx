@@ -23,7 +23,7 @@ beforeEach(() => {
     orders: [
       {
         id: "far",
-        reference: "STT-FAR",
+        reference: "OPL-FAR",
         business: "Far shop",
         sourceBranchId: null,
         sourceName: "HQ",
@@ -32,7 +32,7 @@ beforeEach(() => {
       },
       {
         id: "near",
-        reference: "STT-NEAR",
+        reference: "OPL-NEAR",
         business: "Near shop",
         sourceBranchId: null,
         sourceName: "HQ",
@@ -94,7 +94,7 @@ it("explains a missing HQ pin, then visibly reorders and identifies the first dr
   await click("Suggest nearest stops");
   expect(sequence()).toEqual(["Near shop", "Far shop"]);
   expect(host.textContent).toContain(
-    "Sequence updated. First drop-off: Near shop (STT-NEAR).",
+    "Sequence updated. First drop-off: Near shop (OPL-NEAR).",
   );
   await click("Suggest nearest stops");
   expect(host.textContent).toContain("Already in nearest-stop order.");

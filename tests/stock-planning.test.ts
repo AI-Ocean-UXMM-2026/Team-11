@@ -106,7 +106,7 @@ afterAll(async () => {
 it("uses carryover per SKU: 80 target less 16 leftover requires 64, with no stock change before approval", async () => {
   const b = await branch();
   const plan = await generate(b);
-  expect(plan.rows).toHaveLength(6);
+  expect(plan.rows).toHaveLength(30);
   expect(
     plan.rows.every((r) => r.target === 80 && r.refill === 64 && r.manual),
   ).toBe(true);
@@ -117,7 +117,7 @@ it("uses carryover per SKU: 80 target less 16 leftover requires 64, with no stoc
         [b],
       )
     ).rows[0].p,
-  ).toBe(96);
+  ).toBe(products.length * 16);
   expect(
     (await generate(b, { overrides: overrides(10) })).rows.every(
       (r) => r.refill === 0,
@@ -398,7 +398,7 @@ it("records allocation and protected-stock changes and keeps approved history wh
         [b],
       )
     ).rows[0].count,
-  ).toBe(before + 6);
+  ).toBe(before + products.length);
 });
 it("withholds a monthly recommendation without refill lead-time evidence and counts one order across branch candidates", async () => {
   const b = await branch(),

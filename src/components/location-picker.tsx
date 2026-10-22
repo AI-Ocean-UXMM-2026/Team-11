@@ -1,27 +1,78 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LocationPin } from "@/lib/contact";
-import { pinFromMapbox } from "@/lib/maps";
+import { pinFromMapbox, reverseGeocodeMapbox } from "@/lib/maps";
 import { LocationMap } from "./location-map";
 
 export function LocationPicker({
   required = false,
   initialPin,
+  addressValue,
   label = "Location pin",
   onChange,
+  onAddressChange,
 }: {
   required?: boolean;
   initialPin?: LocationPin;
+  addressValue?: string;
   label?: string;
   onChange?: (pin: LocationPin) => void;
+  onAddressChange?: (address: string) => void;
 }) {
   const [pin, setPin] = useState<LocationPin | undefined>(initialPin);
   const [message, setMessage] = useState("");
   const [locating, setLocating] = useState(false);
+  const [lookingUpAddress, setLookingUpAddress] = useState(false);
+  const lookupId = useRef(0);
+  const lookupController = useRef<AbortController | null>(null);
+  const currentAddress = useRef(addressValue);
+  currentAddress.current = addressValue;
+
+  useEffect(
+    () => () => {
+      lookupController.current?.abort();
+    },
+    [],
+  );
+
   function select(next: LocationPin) {
     setPin(next);
-    setMessage("");
+    const selectionId = ++lookupId.current;
+    lookupController.current?.abort();
+    lookupController.current = null;
+    setMessage(onAddressChange ? "Looking up the address for this pin…" : "");
     onChange?.(next);
+    if (!onAddressChange) return;
+
+    const addressAtSelection = currentAddress.current;
+    const controller = new AbortController();
+    lookupController.current = controller;
+    setLookingUpAddress(true);
+    void reverseGeocodeMapbox(next, controller.signal)
+      .then((address) => {
+        if (selectionId !== lookupId.current || controller.signal.aborted)
+          return;
+        if (!address) {
+          setMessage(
+            "Address lookup was unavailable. You can enter it manually.",
+          );
+          return;
+        }
+        if (currentAddress.current !== addressAtSelection) {
+          setMessage("Address left unchanged because it was edited manually.");
+          return;
+        }
+        onAddressChange(address);
+        currentAddress.current = address;
+        setMessage("Address updated from the pinned location.");
+      })
+      .catch(() => {
+        if (selectionId === lookupId.current && !controller.signal.aborted)
+          setMessage("Address lookup failed. You can enter it manually.");
+      })
+      .finally(() => {
+        if (selectionId === lookupId.current) setLookingUpAddress(false);
+      });
   }
   function locate() {
     if (!navigator.geolocation) {
@@ -74,7 +125,11 @@ export function LocationPicker({
       <input name="latitude" type="hidden" value={pin?.latitude ?? ""} />
       <input name="longitude" type="hidden" value={pin?.longitude ?? ""} />
       <p className="location-selection" role="status">
-        {pin ? "Location selected" : "Choose a location on the map"}
+        {lookingUpAddress
+          ? "Looking up address…"
+          : pin
+            ? "Location selected"
+            : "Choose a location on the map"}
       </p>
       {message && (
         <p role="status" className="muted">

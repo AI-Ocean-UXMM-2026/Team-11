@@ -6,7 +6,7 @@ import "@fontsource/manrope/700.css";
 import "@fontsource/manrope/800.css";
 import "./globals.css";
 import "@/styles/accessibility.css";
-import "@/styles/footwear.css";
+import "@/styles/product-catalog.css";
 import { DriverTrackingProvider } from "@/components/driver-tracking-provider";
 export const metadata: Metadata = {
   title: "SupplyLink · Your network, connected",

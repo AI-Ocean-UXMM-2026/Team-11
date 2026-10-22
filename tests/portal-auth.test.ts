@@ -9,26 +9,27 @@ beforeEach(() => {
   directory = new DemoDirectory();
 });
 const input = {
-  name: "Mingalar Shoes",
-  username: "mingalar.shoes",
+  name: "Mingalar Longyi Shop",
+  username: "mingalar.longyi",
   role: "sme",
-  password: "Temporary-STT-2026",
+  password: "Temporary-Ocean-2026",
   phone: "09123456789",
   address: "Hlaing, Yangon",
   branchId: "",
   pin: { latitude: 16.84, longitude: 96.17 },
 };
 describe("HQ-issued portal credentials", () => {
-  it("keeps the catalog to one STT model with explicit size/color variants", () => {
+  it("uses the imported Ocean Pride Longyi styles as the active catalog", () => {
     expect(new Set(demoData.products.map((p) => p.name)).size).toBe(1);
     expect(
       demoData.products.every(
-        (p) => p.brand === "STT" && p.category === "Shoes",
+        (p) =>
+          p.category === "Longyi" && p.name === "Premium Fine Fabric Longyi",
       ),
     ).toBe(true);
-    expect(
-      new Set(demoData.products.map((p) => `${p.color}-${p.size}`)).size,
-    ).toBe(6);
+    expect(demoData.products).toHaveLength(30);
+    expect(new Set(demoData.products.map((p) => p.pack)).size).toBe(30);
+    expect(demoData.products.every((p) => p.stock === 0)).toBe(true);
   });
   it("requires the correct portal and password", () => {
     expect(
@@ -44,15 +45,15 @@ describe("HQ-issued portal credentials", () => {
   });
   it("accepts case-insensitive full names only in their own portal", () => {
     expect(
-      directory.authenticate("sme", "  MYA THIDA SHOE STORE  ", DEMO_PASSWORD)
+      directory.authenticate("sme", "  MYA THIDA LONGYI SHOP  ", DEMO_PASSWORD)
         .user?.username,
     ).toBe("myathida");
     expect(
-      directory.authenticate("driver", "Mya Thida Shoe Store", DEMO_PASSWORD)
+      directory.authenticate("driver", "Mya Thida Longyi Shop", DEMO_PASSWORD)
         .status,
     ).toBe(401);
     expect(
-      directory.authenticate("sme", "Mya Thida Shoe Store", "wrong").status,
+      directory.authenticate("sme", "Mya Thida Longyi Shop", "wrong").status,
     ).toBe(401);
   });
   it("requires an ID for duplicate names and shares the ID/name attempt limit", () => {
@@ -74,7 +75,7 @@ describe("HQ-issued portal credentials", () => {
     for (let i = 0; i < 8; i++)
       directory.authenticate(
         "sme",
-        i % 2 ? "myathida" : "Mya Thida Shoe Store",
+        i % 2 ? "myathida" : "Mya Thida Longyi Shop",
         "wrong",
       );
     expect(
@@ -127,16 +128,16 @@ describe("HQ-issued portal credentials", () => {
     expect(
       directory.changePassword(user.token, issued.temporaryPassword!).error,
     ).toBeTruthy();
-    expect(directory.changePassword(user.token, "My-new-STT-password")).toEqual(
-      {},
-    );
+    expect(
+      directory.changePassword(user.token, "My-new-Ocean-password"),
+    ).toEqual({});
     expect(directory.session(user.token)?.mustChangePassword).toBe(false);
     expect(
       directory.authenticate("sme", accountId, issued.temporaryPassword!)
         .status,
     ).toBe(401);
     expect(
-      directory.authenticate("sme", accountId, "My-new-STT-password").status,
+      directory.authenticate("sme", accountId, "My-new-Ocean-password").status,
     ).toBe(200);
     expect(JSON.stringify(directory.listAccounts())).not.toContain(
       issued.temporaryPassword!,

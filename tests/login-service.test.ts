@@ -88,11 +88,11 @@ describe("live portal authorisation", () => {
     mocks.resolve.mockResolvedValue("issued-uuid");
     expect(
       await authenticatePortal("sme", {
-        username: "Mya Thida Shoe Store",
+        username: "Mya Thida Longyi Shop",
         password: "test-password",
       }),
     ).toEqual({ status: 200, redirectTo: "/sme" });
-    expect(mocks.resolve).toHaveBeenCalledWith("sme", "mya thida shoe store");
+    expect(mocks.resolve).toHaveBeenCalledWith("sme", "mya thida longyi shop");
     expect(mocks.signIn).toHaveBeenCalledWith({
       email: "issued-uuid@login.supplylink.invalid",
       password: "test-password",

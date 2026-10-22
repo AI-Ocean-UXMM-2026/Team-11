@@ -32,6 +32,7 @@ beforeEach(() => {
     this.removeAttribute("open");
   };
   data = structuredClone(demoData);
+  data.products = data.products.map((p) => ({ ...p, stock: 60 }));
   data.branches = [
     {
       id: branchId,

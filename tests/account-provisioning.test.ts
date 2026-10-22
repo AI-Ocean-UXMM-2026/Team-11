@@ -37,6 +37,7 @@ const input = {
   role: "sme",
   phone: "9123456789",
   phoneCountry: "MM",
+  address: "12 Hlaing Road, Yangon",
   pin: { latitude: 16.84, longitude: 96.17 },
 };
 beforeEach(() => {
@@ -55,12 +56,12 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 
-it("generates credentials on the server and stores only the selected pin as the account location", async () => {
+it("generates credentials on the server and stores the SME address and account location pin", async () => {
   const result = await provisionAccount({
     ...input,
+    address: "12 Hlaing Road, Yangon",
     username: "chosen-id",
     password: "chosen-password",
-    address: "Ignore this address",
   });
   expect(result.error).toBeUndefined();
   expect(result.temporaryPassword).toHaveLength(28);
@@ -76,7 +77,7 @@ it("generates credentials on the server and stores only the selected pin as the 
       id: result.id,
       username: result.username,
       phone: "+959123456789",
-      address: "",
+      address: "12 Hlaing Road, Yangon",
       latitude: 16.84,
       longitude: 96.17,
       must_change_password: true,

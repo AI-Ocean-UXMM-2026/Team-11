@@ -7,6 +7,7 @@ import type {
   DriverDeliveryGroup,
   DriverGroupResult,
 } from "@/lib/delivery-groups";
+import { statusToneClass } from "@/lib/status-tone";
 import { useDriverTracking } from "./driver-tracking-provider";
 
 async function requestGroups<T>(init?: RequestInit): Promise<T> {
@@ -83,7 +84,9 @@ function PickupGroup({
     >
       <div className="heading-inline">
         <h3>Collect from {group.sourceName}</h3>
-        <span className="status-badge">
+        <span
+          className={`status-badge ${statusToneClass(group.acceptedAt ? "Accepted" : "Awaiting acceptance")}`}
+        >
           {group.acceptedAt ? "Accepted" : "Awaiting acceptance"}
         </span>
       </div>

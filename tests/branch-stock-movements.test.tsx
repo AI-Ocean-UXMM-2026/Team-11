@@ -11,13 +11,14 @@ const workflowAction = vi.hoisted(() => vi.fn());
 vi.mock("../src/app/workflow-actions", () => ({ workflowAction }));
 let host: HTMLDivElement, root: Root, client: QueryClient;
 const branchId = "10000000-0000-4000-8000-000000000001";
-const updated = vi.fn(async () => {}), refresh = vi.fn(async () => {});
+const updated = vi.fn(async () => {}),
+  refresh = vi.fn(async () => {});
 const pendingTransfer = {
   id: "pending",
   reference: "TR-PENDING",
   sourceBranchId: null,
   destinationBranchId: branchId,
-  source: "STT Yangon HQ",
+  source: "Ocean Pride Longyi HQ",
   destination: "Hlaing branch",
   productId: "product-1",
   variant: "Black · EU 38",
@@ -52,8 +53,20 @@ async function render() {
     query: {},
     transfers: [
       pendingTransfer,
-      { ...pendingTransfer, id: "received", reference: "TR-RECEIVED", status: "received" },
-      { ...pendingTransfer, id: "outgoing", reference: "TR-OUT", sourceBranchId: branchId, destinationBranchId: null, destination: "STT Yangon HQ" },
+      {
+        ...pendingTransfer,
+        id: "received",
+        reference: "TR-RECEIVED",
+        status: "received",
+      },
+      {
+        ...pendingTransfer,
+        id: "outgoing",
+        reference: "TR-OUT",
+        sourceBranchId: branchId,
+        destinationBranchId: null,
+        destination: "Ocean Pride Longyi HQ",
+      },
     ],
     branches: [
       {
@@ -124,9 +137,9 @@ it("shows received physical stock records after switching to Record", async () =
     })),
   );
   await render();
-  const recordTab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
-    (tab) => tab.textContent?.includes("Record"),
-  )!;
+  const recordTab = [
+    ...host.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+  ].find((tab) => tab.textContent?.includes("Record"))!;
   await act(async () => recordTab.click());
   await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
   expect(host.textContent).toContain("Received physical stock");

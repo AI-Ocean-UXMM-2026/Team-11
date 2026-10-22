@@ -102,7 +102,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px;
-  background: #f8faf6;
+  background: #F9F9F9;
   min-width: 0;
 }
 .branch-pool-summary small {
@@ -152,20 +152,20 @@
 .branch-close {
   margin: 0 24px 24px;
   padding: 20px;
-  border: 1px solid #e5d2c3;
+  border: 1px solid #D5D5D5;
   border-radius: 10px;
-  background: #fffaf6;
+  background: #FBFBFB;
   font-size: 13px;
 }
 .branch-close summary {
   font-weight: 700;
   cursor: pointer;
-  color: #894426;
+  color: #515151;
 }
 .workflow-status.closed {
-  background: #f4f0ec;
-  border-color: #dfd5cd;
-  color: #765d4b;
+  background: #F1F1F1;
+  border-color: #D7D7D7;
+  color: #616161;
 }
 .stock-transfer-panel {
   margin-bottom: 24px;
@@ -205,7 +205,7 @@
   position: sticky;
   bottom: 20px;
   z-index: 4;
-  box-shadow: 0 5px 25px #20332b18;
+  box-shadow: 0 5px 25px #2E2E2E18;
 }
 .branch-workspace .button,
 .transfer-row .button {
@@ -357,8 +357,9 @@
 }
 .branch-history-error {
   padding: 16px;
-  background: #fff4ed;
-  border: 1px solid #e6c7b7;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
   border-radius: 10px;
   margin-bottom: 12px;
 }

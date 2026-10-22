@@ -18,7 +18,7 @@ export class WorkflowError extends Error {
     message: string,
     public status = 400,
   ) {
-    super(message);
+    super(presentPortalMessage(message));
   }
 }
 export class PasswordChangeRequired extends WorkflowError {
@@ -132,38 +132,129 @@ export async function workflowList(
 ): Promise<ListPage> {
   const parameters = { ...parseWorkspaceQuery(query), page };
   if (isDemoMode())
-    return localRequest(actor.id, async (tx) => {
-      const { rows } = await tx.query<{ result: ListPage }>(
-        "select public.workflow_list($1,$2::jsonb) as result",
-        [kind, JSON.stringify(parameters)],
-      );
-      return rows[0].result;
-    });
+    return presentPortalData(
+      await localRequest(actor.id, async (tx) => {
+        const { rows } = await tx.query<{ result: ListPage }>(
+          "select public.workflow_list($1,$2::jsonb) as result",
+          [kind, JSON.stringify(parameters)],
+        );
+        return rows[0].result;
+      }),
+    );
   const db = await createClient();
   const { data, error } = await db.rpc("workflow_list", {
     p_kind: kind,
     p_query: parameters,
   });
   if (error) throw new WorkflowError(error.message);
-  return data;
+  return presentPortalData(data);
 }
 export async function workflowSnapshot(
   actor: Viewer,
   input: WorkspaceQuery = {},
 ): Promise<WorkspaceData> {
   const query = parseWorkspaceQuery(input);
-  if (isDemoMode())
-    return localRequest(actor.id, async (tx) => {
-      const { rows } = await tx.query<{ result: WorkspaceData }>(
-        "select public.workflow_snapshot($1::jsonb) as result",
-        [JSON.stringify(query)],
-      );
-      return rows[0].result;
-    });
+  if (isDemoMode()) {
+    const data = await localRequest(actor.id, async (tx) => {
+        const { rows } = await tx.query<{ result: WorkspaceData }>(
+          "select public.workflow_snapshot($1::jsonb) as result",
+          [JSON.stringify(query)],
+        );
+        const { rows: profiles } = await tx.query<{
+          phone: string;
+          address: string;
+          latitude: number | null;
+          longitude: number | null;
+        }>(
+          "select phone,address,latitude,longitude from public.profiles where id=auth.uid() and role='sme'",
+        );
+        const profile = profiles[0];
+        return {
+          ...rows[0].result,
+          ...(profile
+            ? {
+                profile: {
+                  phone: profile.phone,
+                  address: profile.address,
+                  pin:
+                    profile.latitude == null || profile.longitude == null
+                      ? null
+                      : {
+                          latitude: profile.latitude,
+                          longitude: profile.longitude,
+                        },
+                },
+              }
+            : {}),
+        };
+      });
+    return presentPortalData(data);
+  }
   const db = await createClient();
-  const { data, error } = await db.rpc("workflow_snapshot", { p_query: query });
-  if (error) throw new WorkflowError(error.message);
-  return data;
+  const [snapshot, profileResult] = await Promise.all([
+    db.rpc("workflow_snapshot", { p_query: query }),
+    actor.role === "sme"
+      ? db
+          .from("profiles")
+          .select("phone,address,latitude,longitude")
+          .eq("id", actor.id)
+          .eq("role", "sme")
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+  if (snapshot.error) throw new WorkflowError(snapshot.error.message);
+  if (profileResult.error) throw new WorkflowError(profileResult.error.message);
+  const account = profileResult.data;
+  return presentPortalData({
+    ...snapshot.data,
+    ...(account
+      ? {
+          profile: {
+            phone: account.phone,
+            address: account.address,
+            pin:
+              account.latitude == null || account.longitude == null
+                ? null
+                : {
+                    latitude: account.latitude,
+                    longitude: account.longitude,
+                  },
+          },
+        }
+      : {}),
+  });
+}
+
+export function presentPortalData<T>(data: T): T {
+  const present = (value: unknown, key?: string): unknown => {
+    if (Array.isArray(value)) return value.map((item) => present(item));
+    if (value && typeof value === "object")
+      return Object.fromEntries(
+        Object.entries(value).map(([childKey, child]) => [
+          childKey,
+          present(child, childKey),
+        ]),
+      );
+    if (typeof value !== "string") return value;
+    if (key === "brand" && value === "STT") return "Ocean Pride Longyi";
+    if (value === "STT Yangon HQ") return "Ocean Pride Longyi HQ";
+    if (key === "reference" && value.startsWith("STT-"))
+      return `OPL-${value.slice(4)}`;
+    return value;
+  };
+  return present(data) as T;
+}
+
+function presentPortalMessage(message: string): string {
+  return message
+    .replace(/\bSTT Yangon HQ\b/g, "Ocean Pride Longyi HQ")
+    .replace(/\bSTT shoe variant\b/gi, "Ocean Pride Longyi style")
+    .replace(/\bSTT variant\b/gi, "Ocean Pride Longyi style")
+    .replace(/\bshoe variant\b/gi, "Longyi style")
+    .replace(/\bsneakers?\b/gi, "Longyi")
+    .replace(/\bfootwear\b/gi, "Longyi")
+    .replace(/\bshoes?\b/gi, "Longyi")
+    .replace(/\bSTT\b/g, "Ocean Pride Longyi");
 }
 export async function readEvidence(
   actor: Viewer,

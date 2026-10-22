@@ -10,6 +10,12 @@ The owner approved creation of their own `hq.admin` account, named **Supply Link
 
 The bootstrap script refuses to rotate or replace an existing HQ account. It is not a password-reset tool. Do not reuse the sample demo password for hosted accounts.
 
+## First HQ account on a new deployment
+
+For a new production Supabase project, apply the regular migrations only. Set `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in a trusted deployment/admin environment, then run `BOOTSTRAP_HQ=true npm run bootstrap:hq` from the project directory. On Windows PowerShell, use `$env:BOOTSTRAP_HQ = "true"` followed by `npm run bootstrap:hq`. The script only proceeds when `profiles` is empty, creates `hq.admin`, requires a password change at first login, and saves the one-time password to `.data/initial-hq-credentials-<project-ref>.txt`. Keep the service key server-side and remove the credential file after recording the password securely.
+
+Do not run `supabase/test-seed.sql` or `npm run seed:test-accounts` in production. They are only for a separate test project.
+
 ## Finish business configuration
 
 1. In the Supabase dashboard, open **Authentication → Sign In / Providers** and disable **Allow new users to sign up**. This setting was still enabled during verification. The available connector cannot change Auth configuration, and the in-app dashboard browser is not signed in. The application has no public signup UI; an Auth identity without an active HQ-issued profile cannot access operational data.

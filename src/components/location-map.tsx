@@ -13,12 +13,42 @@ import {
 import type { LocationPin } from "@/lib/contact";
 import "mapbox-gl/dist/mapbox-gl.css";
 
+function coloredPin(color: string, label: string) {
+  const element = document.createElement("div");
+  element.className = "location-map-marker";
+  element.setAttribute("aria-label", label);
+  element.style.setProperty("--location-marker-color", color);
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 36 44");
+  svg.setAttribute("aria-hidden", "true");
+  const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  shape.setAttribute(
+    "d",
+    "M18 1C8.6 1 1 8.6 1 18c0 12 17 25 17 25s17-13 17-25C35 8.6 27.4 1 18 1Z",
+  );
+  shape.setAttribute("fill", "currentColor");
+  shape.setAttribute("stroke", "white");
+  shape.setAttribute("stroke-width", "2");
+  const center = document.createElementNS(
+    "http://www.w3.org/2000/svg",
+    "circle",
+  );
+  center.setAttribute("cx", "18");
+  center.setAttribute("cy", "18");
+  center.setAttribute("r", "5");
+  center.setAttribute("fill", "white");
+  svg.append(shape, center);
+  element.append(svg);
+  return element;
+}
+
 export function LocationMap({
   pin,
   label,
   select,
   pinLabel = "Saved location",
-  pinColor = "#17674f",
+  pinColor = "#454545",
   markers,
   route,
   remainingRoute,
@@ -92,8 +122,12 @@ export function LocationMap({
         map.addControl(new mapboxgl.FullscreenControl(), "top-right");
         map.on("dragstart", () => setFollowing(false));
         marker.current = new mapboxgl.Marker({
-          color: pinColor,
+          element: coloredPin(
+            pinColor,
+            editable ? "Selected location — drag to move" : pinLabel,
+          ),
           draggable: editable,
+          anchor: "bottom",
         });
         marker.current
           .getElement()
@@ -220,7 +254,10 @@ export function LocationMap({
     if (!map || !mapboxgl) return;
     const entries: NonNullable<typeof markers> = JSON.parse(markerKey);
     const points = entries.map((entry) => {
-      const point = new mapboxgl.Marker({ color: entry.color })
+      const point = new mapboxgl.Marker({
+        element: coloredPin(entry.color, entry.label),
+        anchor: "bottom",
+      })
         .setLngLat(mapboxCoordinates(entry.pin))
         .addTo(map);
       point.getElement().setAttribute("aria-label", entry.label);

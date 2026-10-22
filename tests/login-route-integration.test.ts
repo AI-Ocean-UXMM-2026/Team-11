@@ -46,12 +46,10 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ data: { user: { id } }, error: null });
   mocks.signOut.mockReset().mockResolvedValue({ error: null });
-  mocks.single
-    .mockReset()
-    .mockResolvedValue({
-      data: { role: "branch", status: "active", must_change_password: true },
-      error: null,
-    });
+  mocks.single.mockReset().mockResolvedValue({
+    data: { role: "branch", status: "active", must_change_password: true },
+    error: null,
+  });
   mocks.lookup
     .mockReset()
     .mockResolvedValueOnce({ data: [], error: null })
@@ -63,7 +61,7 @@ it.each([
   { portal: "hq", name: "HQ Administrator", handler: hqLogin, home: "/" },
   {
     portal: "sme",
-    name: "Example Shoe Store",
+    name: "Example Longyi Shop",
     handler: smeLogin,
     home: "/sme",
   },

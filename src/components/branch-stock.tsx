@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import { Package, RefreshCw, Search } from "lucide-react";
-import { productPhoto } from "@/lib/checkout";
+import { productPhoto, productUnit } from "@/lib/checkout";
 import type { Product, WorkspaceData } from "@/lib/domain";
+import { statusToneClass } from "@/lib/status-tone";
 
 export function BranchStock({
   data,
@@ -62,11 +63,10 @@ export function BranchStock({
     }),
     { available: 0, retail: 0, backup: 0, allocated: 0 },
   );
+  const unit = rows.length ? productUnit(rows[0].product) : "unit";
   const query = search.trim().toLowerCase();
   const filtered = rows.filter(({ product: p }) =>
-    `${p.name} ${p.brand} ${p.color} ${p.size} ${p.pack}`
-      .toLowerCase()
-      .includes(query),
+    `${p.name} ${p.color} ${p.size} ${p.pack}`.toLowerCase().includes(query),
   );
   return (
     <section
@@ -78,8 +78,8 @@ export function BranchStock({
           <p className="greeting">{branch.name}</p>
           <h2 id="branch-stock-title">Available product stock</h2>
           <p>
-            Available pairs include retail stock and wholesale backup. Allocated
-            pairs are already committed to deliveries.
+            Available stock includes retail stock and wholesale backup.
+            Allocated units are already committed to deliveries.
           </p>
         </div>
         <button
@@ -94,7 +94,7 @@ export function BranchStock({
       <dl className="branch-stock-totals">
         {(
           [
-            ["Available pairs", totals.available],
+            ["Available stock", totals.available],
             ["Retail available", totals.retail],
             ["Wholesale backup", totals.backup],
             ["Allocated to deliveries", totals.allocated],
@@ -103,7 +103,7 @@ export function BranchStock({
           <div key={label}>
             <dt>{label}</dt>
             <dd>
-              {value.toLocaleString()} <small>pairs</small>
+              {value.toLocaleString()} <small>{unit}s</small>
             </dd>
           </div>
         ))}
@@ -115,7 +115,7 @@ export function BranchStock({
           <input
             value={search}
             onChange={(event) => onSearch(event.target.value)}
-            placeholder="Search product, color or size…"
+            placeholder="Search product or style…"
           />
         </label>
         <span>
@@ -126,13 +126,13 @@ export function BranchStock({
         <div
           className="table-scroll"
           role="region"
-          aria-label="Product stock by size and color"
+          aria-label="Product stock by style"
           tabIndex={0}
         >
           <table>
             <thead>
               <tr>
-                <th>Product / variant</th>
+                <th>Product / style</th>
                 <th>Available</th>
                 <th>Retail</th>
                 <th>Wholesale backup</th>
@@ -149,9 +149,12 @@ export function BranchStock({
                     </td>
                     <td>
                       <strong className="branch-stock-available">
-                        {available} pairs
+                        {available} {productUnit(product)}
+                        {available === 1 ? "" : "s"}
                       </strong>
-                      <small>
+                      <small
+                        className={`branch-stock-status ${statusToneClass(available === 0 ? "Out of stock" : available < 10 ? "Low stock" : "In stock")}`}
+                      >
                         {available === 0
                           ? "Out of stock"
                           : available < 10
@@ -159,10 +162,18 @@ export function BranchStock({
                             : "In stock"}
                       </small>
                     </td>
-                    <td>{retail} pairs</td>
-                    <td>{backup} pairs</td>
-                    <td>{allocated} pairs</td>
-                    <td>{onHand} pairs</td>
+                    <td>
+                      {retail} {productUnit(product)}s
+                    </td>
+                    <td>
+                      {backup} {productUnit(product)}s
+                    </td>
+                    <td>
+                      {allocated} {productUnit(product)}s
+                    </td>
+                    <td>
+                      {onHand} {productUnit(product)}s
+                    </td>
                   </tr>
                 ),
               )}
@@ -175,7 +186,7 @@ export function BranchStock({
           <h3>{rows.length ? "No matching products" : "No products yet"}</h3>
           <p>
             {rows.length
-              ? "Try another product name, color or size."
+              ? "Try another product name or style."
               : "Products will appear here when HQ adds them to the catalog."}
           </p>
         </div>
@@ -192,16 +203,14 @@ function StockProduct({ product }: { product: Product }) {
   return (
     <div className="branch-stock-product">
       <Image
-        src={productPhoto(product.color)}
-        alt={`${product.color} ${product.name}`}
+        src={productPhoto(product)}
+        alt={`${product.name}, ${product.pack}`}
         width={64}
         height={48}
       />
       <div>
         <strong>{product.name}</strong>
-        <small>
-          {product.color} · EU {product.size}
-        </small>
+        <small>{product.pack}</small>
       </div>
     </div>
   );

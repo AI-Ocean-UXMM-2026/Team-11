@@ -3,114 +3,92 @@ import { useState } from "react";
 import Image from "next/image";
 import { Check, Plus, ShoppingBag } from "lucide-react";
 import { money, type Product } from "@/lib/domain";
-import { cartLines, productPhoto, type Cart } from "@/lib/checkout";
+import {
+  cartLines,
+  productPhoto,
+  productUnit,
+  type Cart,
+} from "@/lib/checkout";
 
 function ProductCard({
-  variants,
+  product,
   basket,
   change,
 }: {
-  variants: Product[];
+  product: Product;
   basket: Cart;
   change: (cart: Cart) => void;
 }) {
-  const [size, setSize] = useState(variants[0].size);
-  const [quantity, setQuantity] = useState(variants[0].minimum);
+  const [quantity, setQuantity] = useState(product.minimum);
   const [added, setAdded] = useState("");
-  const product = variants.find((p) => p.size === size) ?? variants[0];
   const available = Math.max(0, product.stock - (basket[product.id] ?? 0));
+  const unit = productUnit(product);
   const valid =
     Number.isInteger(quantity) &&
     quantity >= product.minimum &&
     quantity % product.minimum === 0 &&
     quantity <= available;
   return (
-    <article className="sneaker-card">
-      <div
-        className={`sneaker-photo sneaker-photo-${product.color.toLowerCase()}`}
-      >
+    <article className="catalog-product-card product-card">
+      <div className="catalog-product-photo product-photo">
         <Image
-          src={productPhoto(product.color)}
-          alt={`${product.color} STT Everyday sneaker, side view`}
-          width={1448}
-          height={1086}
-          sizes="(max-width: 600px) 100vw, (max-width: 1000px) 45vw, 40vw"
+          src={productPhoto(product)}
+          alt={`${product.name}, ${product.pack}`}
+          width={800}
+          height={800}
+          sizes="(max-width: 600px) 100vw, (max-width: 1000px) 45vw, 30vw"
         />
-        <span className="sneaker-color">{product.color}</span>
+        <span className="catalog-product-color">{product.pack}</span>
       </div>
-      <div className="sneaker-card-body">
-        <div className="sneaker-card-heading">
+      <div className="catalog-product-card-body">
+        <div className="catalog-product-card-heading">
           <div>
-            <p>STT Everyday collection</p>
-            <h2>{product.color} sneaker</h2>
+            <p>{product.category}</p>
+            <h2>{product.name}</h2>
           </div>
-          <p className="sneaker-unit-price">
-            <strong>{money(product.price)}</strong> MMK <span>/ pair</span>
+          <p className="catalog-product-unit-price">
+            <strong>{money(product.price)}</strong> MMK <span>/ {unit}</span>
           </p>
         </div>
-        <p className="sneaker-description">
-          Low-top sneaker · Lace-up fit · Durable sole
-        </p>
-        <div className="sneaker-selection">
-          <fieldset className="variant-field">
-            <legend>Choose EU size</legend>
-            <div className="size-options">
-              {variants.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  aria-pressed={product.id === p.id}
-                  disabled={p.stock < p.minimum}
-                  className={product.id === p.id ? "selected" : ""}
-                  onClick={() => {
-                    setSize(p.size);
-                    setQuantity(p.minimum);
-                    setAdded("");
-                  }}
-                >
-                  {p.size}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-          <div className="sneaker-add-controls">
-            <label className="field">
-              Pairs
-              <input
-                aria-label={`${product.color} sneaker quantity`}
-                type="number"
-                min={product.minimum}
-                max={available}
-                step={product.minimum}
-                value={quantity}
-                onChange={(e) => {
-                  setQuantity(Number(e.target.value));
-                  setAdded("");
-                }}
-              />
-            </label>
-            <button
-              className="button primary"
-              disabled={!valid}
-              onClick={() => {
-                change({
-                  ...basket,
-                  [product.id]: (basket[product.id] ?? 0) + quantity,
-                });
-                setAdded(
-                  `${quantity} ${product.color.toLowerCase()} pairs, EU ${product.size}, added to cart.`,
-                );
+        <p className="catalog-product-description">{product.pack}</p>
+        <div className="catalog-product-selection product-selection">
+          <label className="field">
+            Quantity ({unit}s)
+            <input
+              aria-label={`${product.name} ${product.pack} quantity`}
+              type="number"
+              min={product.minimum}
+              max={available}
+              step={product.minimum}
+              value={quantity}
+              onChange={(e) => {
+                setQuantity(Number(e.target.value));
+                setAdded("");
               }}
-            >
-              <Plus size={17} />
-              Add to cart
-            </button>
-          </div>
+            />
+          </label>
+          <button
+            className="button primary"
+            disabled={!valid}
+            onClick={() => {
+              change({
+                ...basket,
+                [product.id]: (basket[product.id] ?? 0) + quantity,
+              });
+              setAdded(
+                `${quantity} ${unit}${quantity === 1 ? "" : "s"} added to cart.`,
+              );
+            }}
+          >
+            <Plus size={17} />
+            Add to cart
+          </button>
         </div>
-        <p className="sneaker-stock">
-          {available} pairs available · Minimum {product.minimum} per size
+        <p className="catalog-product-stock">
+          {available} {unit}
+          {available === 1 ? "" : "s"} available · Minimum {product.minimum}
         </p>
-        <p className="sneaker-added" role="status">
+        <p className="catalog-product-added" role="status">
           {added && (
             <>
               <Check size={15} />
@@ -136,26 +114,23 @@ export function ProductCatalog({
   search?: string;
   viewCart: () => void;
 }) {
-  const groups = [...new Set(products.map((p) => p.color))].map((color) =>
-    products.filter((p) => p.color === color),
-  );
-  const visible = groups.filter((variants) =>
-    variants.some((p) =>
-      `${p.name} ${p.color} ${p.size}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
-    ),
+  const visible = products.filter((product) =>
+    `${product.name} ${product.category} ${product.pack} ${product.sku ?? ""}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
   );
   const lines = cartLines(products, basket),
     count = lines.reduce((n, p) => n + p.quantity, 0),
     subtotal = lines.reduce((n, p) => n + p.price * p.quantity, 0);
+  const units = [...new Set(lines.map((line) => productUnit(line)))];
+  const cartUnit = units.length === 1 ? units[0] : "items";
   return (
     <>
-      <div className="sneaker-card-grid">
-        {visible.map((variants) => (
+      <div className="catalog-product-card-grid product-card-grid">
+        {visible.map((product) => (
           <ProductCard
-            key={variants[0].color}
-            variants={variants}
+            key={product.id}
+            product={product}
             basket={basket}
             change={change}
           />
@@ -164,8 +139,8 @@ export function ProductCatalog({
       {!visible.length && (
         <div className="checkout-empty">
           <ShoppingBag size={30} />
-          <h2>No sneakers match your search</h2>
-          <p>Try a color or EU size 38, 39 or 40.</p>
+          <h2>No products match your search</h2>
+          <p>Try searching by product name or style.</p>
         </div>
       )}
       <div className="catalog-cart-bar">
@@ -174,13 +149,13 @@ export function ProductCatalog({
           <div>
             <strong>
               {count
-                ? `${count} pairs in your cart`
-                : "Your next restock starts here"}
+                ? `${count} ${cartUnit} in your cart`
+                : "Your order starts here"}
             </strong>
             <small>
               {count
-                ? `${lines.length} size / color variants · ${money(subtotal)} MMK`
-                : "Choose your colors and sizes, then review your cart."}
+                ? `${lines.length} product styles · ${money(subtotal)} MMK`
+                : "Choose products, then review your cart."}
             </small>
           </div>
         </div>

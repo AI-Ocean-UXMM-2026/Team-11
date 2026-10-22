@@ -13,7 +13,13 @@ import {
   Upload,
 } from "lucide-react";
 import { workflowAction } from "@/app/workflow-actions";
-import { cartError, cartLines, productPhoto, type Cart } from "@/lib/checkout";
+import {
+  cartError,
+  cartLines,
+  productPhoto,
+  productUnit,
+  type Cart,
+} from "@/lib/checkout";
 import {
   internationalPhone,
   pinFromForm,
@@ -43,7 +49,7 @@ type Shop = {
   pin?: LocationPin;
 };
 const titles: Record<Step, string> = {
-  items: "Select your sneakers",
+  items: "Select products",
   cart: "Your cart",
   shop: "Add shop information",
   review: "Review your order",
@@ -72,11 +78,12 @@ export function SmeCheckout({
   const [basket, setBasket] = useState<Cart>({});
   const [shop, setShop] = useState<Shop>({
     name: viewer.name,
-    receiver: "",
-    phone: "",
+    receiver: viewer.name,
+    phone: data.profile?.phone ?? "",
     country: "MM",
-    address: "",
+    address: data.profile?.address ?? "",
     notes: "",
+    pin: data.profile?.pin ?? undefined,
   });
   const [created, setCreated] = useState<Order | null>(null);
   const [pending, setPending] = useState(false);
@@ -258,7 +265,13 @@ export function SmeCheckout({
         <h3>Order summary</h3>
         <dl>
           <div>
-            <dt>{created?.items ?? count} pairs</dt>
+            <dt>
+              {created?.items ?? count}{" "}
+              {productUnit(
+                lines[0] ?? data.products[0] ?? { category: "Longyi" },
+              )}
+              s
+            </dt>
             <dd>{money(created?.merchandise ?? subtotal)} MMK</dd>
           </div>
           <div>
@@ -290,26 +303,24 @@ export function SmeCheckout({
         {lines.map((p) => (
           <article className="checkout-cart-item" key={p.id}>
             <Image
-              src={productPhoto(p.color)}
-              alt={`${p.color} STT sneaker`}
+              src={productPhoto(p)}
+              alt={`${p.name}, ${p.pack}`}
               width={160}
               height={120}
               sizes="135px"
             />
             <div className="checkout-cart-description">
               <h3>{p.name}</h3>
-              <p>
-                {p.color} · EU {p.size}
-              </p>
+              <p>{p.pack}</p>
               <small>
-                Low-top lace-up sneaker · {money(p.price)} MMK / pair
+                {p.category} · {money(p.price)} MMK / {productUnit(p)}
               </small>
               {editable ? (
                 <div className="cart-item-actions">
                   <label>
                     Pairs
                     <input
-                      aria-label={`${p.color} EU ${p.size} cart quantity`}
+                      aria-label={`${p.name} ${p.pack} cart quantity`}
                       type="number"
                       min={p.minimum}
                       max={p.stock}
@@ -326,7 +337,7 @@ export function SmeCheckout({
                   <button
                     type="button"
                     className="text-link"
-                    aria-label={`Remove ${p.color} EU ${p.size}`}
+                    aria-label={`Remove ${p.name} ${p.pack}`}
                     onClick={() => {
                       const next = { ...basket };
                       delete next[p.id];
@@ -338,7 +349,10 @@ export function SmeCheckout({
                   </button>
                 </div>
               ) : (
-                <p>{p.quantity} pairs</p>
+                <p>
+                  {p.quantity} {productUnit(p)}
+                  {p.quantity === 1 ? "" : "s"}
+                </p>
               )}
             </div>
             <strong>{money(p.price * p.quantity)} MMK</strong>
@@ -419,11 +433,9 @@ export function SmeCheckout({
           <div className="checkout-empty">
             <ShoppingBag size={36} />
             <h3>Your cart is empty</h3>
-            <p>
-              Choose your sneaker colors and sizes to start your next restock.
-            </p>
+            <p>Browse the product catalog to start your next order.</p>
             <button className="button primary" onClick={() => go("items")}>
-              Browse sneakers
+              Browse products
             </button>
           </div>
         ) : (
@@ -458,7 +470,8 @@ export function SmeCheckout({
           >
             <h3>Where should we deliver?</h3>
             <p className="muted">
-              Add the shop and contact details for this order.
+              Your saved account location is prefilled. Change details for this
+              order, or update your default delivery location in Settings.
             </p>
             <div className="form-grid">
               <label className="field">
@@ -493,7 +506,13 @@ export function SmeCheckout({
               Full delivery address
               <textarea
                 name="address"
-                defaultValue={shop.address}
+                value={shop.address}
+                onChange={(event) =>
+                  setShop((current) => ({
+                    ...current,
+                    address: event.target.value,
+                  }))
+                }
                 required
                 minLength={5}
                 maxLength={300}
@@ -501,7 +520,14 @@ export function SmeCheckout({
                 placeholder="Street, building, township, Yangon"
               />
             </label>
-            <LocationPicker label="Shop location pin" initialPin={shop.pin} />
+            <LocationPicker
+              label="Shop location pin"
+              initialPin={shop.pin}
+              addressValue={shop.address}
+              onAddressChange={(address) =>
+                setShop((current) => ({ ...current, address }))
+              }
+            />
             <label className="field">
               Delivery notes (optional)
               <textarea
@@ -662,7 +688,7 @@ export function SmeCheckout({
           <h2>Your order is with HQ</h2>
           <p>
             Transaction evidence received. HQ will verify your payment before
-            confirming the order and reserving your sneakers.
+            confirming the order and reserving your products.
           </p>
           <div className="checkout-success-reference">
             <small>Order reference</small>

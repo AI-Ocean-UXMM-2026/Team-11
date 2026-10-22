@@ -65,11 +65,11 @@ it("renders map-only navigation and returns to the same order popup on its origi
     );
     expect(host.querySelector("a")?.textContent).toContain("Back to order");
     for (const text of [
-      "STT WHOLESALE",
+      "OCEAN PRIDE WHOLESALE",
       "Fulfilment",
       "Report delivery handover",
       "Order activity",
-      "STT Everyday sneaker",
+      "Ocean Pride Longyi",
     ])
       expect(host.textContent).not.toContain(text);
   }

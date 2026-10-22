@@ -40,7 +40,7 @@ beforeEach(() => {
     ...demoData.orders[0],
     business: "My private shop",
     location: "My shop address",
-    reference: "STT-MY-ORDER",
+    reference: "OPL-MY-ORDER",
     items: 10,
     status: "Shipping",
     workflow: {
@@ -60,14 +60,14 @@ beforeEach(() => {
       lines: [
         {
           productId: "black-39",
-          name: "STT Shoe",
+          name: "Premium Fine Fabric Longyi",
           variant: "Black · EU 39",
           quantity: 4,
           unitPrice: 45000,
         },
         {
           productId: "white-40",
-          name: "STT Shoe",
+          name: "Premium Fine Fabric Longyi",
           variant: "White · EU 40",
           quantity: 6,
           unitPrice: 45000,
@@ -153,7 +153,7 @@ it("uses the requested columns and keeps item inspection separate from opening o
   const dialog = host.querySelector("dialog")!;
   expect(dialog.hasAttribute("open")).toBe(true);
   for (const text of [
-    "STT Shoe",
+    "Premium Fine Fabric Longyi",
     "Black · EU 39",
     "White · EU 40",
     "4 pairs",
@@ -168,7 +168,7 @@ it("uses the requested columns and keeps item inspection separate from opening o
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>(
-        'button[aria-label="View order STT-MY-ORDER"]',
+        'button[aria-label="View order OPL-MY-ORDER"]',
       )!
       .click(),
   );

@@ -1,4 +1,8 @@
-import { workflowActor, WorkflowError } from "@/lib/workflow/server";
+import {
+  presentPortalData,
+  workflowActor,
+  WorkflowError,
+} from "@/lib/workflow/server";
 import {
   driverDeliveryGroups,
   driverGroupAction,
@@ -19,7 +23,11 @@ function failure(error: unknown) {
 export async function GET() {
   try {
     return Response.json(
-      { data: await driverDeliveryGroups(await workflowActor()) },
+      {
+        data: presentPortalData(
+          await driverDeliveryGroups(await workflowActor()),
+        ),
+      },
       { headers },
     );
   } catch (error) {
@@ -44,7 +52,7 @@ export async function POST(request: Request) {
       throw new WorkflowError("Invalid group pickup request.");
     }
     return Response.json(
-      { data: await driverGroupAction(actor, input) },
+      { data: presentPortalData(await driverGroupAction(actor, input)) },
       { headers },
     );
   } catch (error) {

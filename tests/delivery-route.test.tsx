@@ -30,7 +30,7 @@ beforeEach(() => {
   const date = new Date().toISOString();
   data = {
     orderId: "order",
-    reference: "STT",
+    reference: "OPL",
     status: "Shipping",
     attemptId: "attempt",
     driverId: "driver",
@@ -150,7 +150,7 @@ it("labels preceding customer stops anonymously and shows the customer's own num
   });
   expect(markers.find((marker: any) => marker.id === "stop-2")).toMatchObject({
     number: 2,
-    color: "#17674f",
+    color: "#16834A",
   });
 });
 it("shows planned source routing before pickup, and does not request a route without a source or destination", async () => {

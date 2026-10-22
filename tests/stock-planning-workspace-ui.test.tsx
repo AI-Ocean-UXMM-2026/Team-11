@@ -14,7 +14,7 @@ const original: BackupPlanningRow = {
   branchId: "00000000-0000-4000-8000-000000000001",
   branchName: "Hlaing",
   productId: "00000000-0000-4000-8000-000000000002",
-  productName: "STT Sneaker",
+  productName: "Premium Fine Fabric Longyi",
   variant: "Black EU 40",
   unit: "pairs",
   retail: 240,
@@ -261,7 +261,9 @@ it("shows an existing refill instead of offering a duplicate and does not count 
   expect(host.textContent).toContain("1 open backup refill");
   expect(host.textContent).toContain("In transit");
   expect(host.textContent).toContain("branch confirms physical receipt");
-  expect(host.textContent).toContain("Waiting for the branch to confirm physical receipt.");
+  expect(host.textContent).toContain(
+    "Waiting for the branch to confirm physical receipt.",
+  );
   expect(host.textContent).not.toContain("Confirm arrival date");
   expect(
     [...host.querySelectorAll("button")].some((b) =>

@@ -12,6 +12,20 @@ import { cookies } from "next/headers";
 import { loginPortals, portalHome, type LoginPortal } from "@/lib/portals";
 import { createClient } from "@/lib/supabase/server";
 import { isDemoMode, supabaseConfig } from "@/lib/supabase/config";
+import { z } from "zod";
+import { locationSchema } from "@/lib/contact";
+import { localRequest } from "@/lib/workflow/local";
+import {
+  parseWorkspaceQuery,
+  workflowActor,
+  workflowSnapshot,
+} from "@/lib/workflow/server";
+import type { WorkspaceQuery } from "@/lib/workflow/query";
+
+const smeDeliveryLocationSchema = z.object({
+  address: z.string().trim().min(5).max(300),
+  pin: locationSchema,
+});
 
 export async function signIn(_previous: { error: string }, form: FormData) {
   const portal = String(form.get("portal") ?? "hq") as LoginPortal;
@@ -32,6 +46,55 @@ export async function signOut() {
     await db.auth.signOut();
   }
   redirect("/login");
+}
+export async function saveSmeDeliveryLocation(
+  input: unknown,
+  queryInput: WorkspaceQuery = {},
+): Promise<{ error?: string; data?: Awaited<ReturnType<typeof workflowSnapshot>> }> {
+  const parsed = smeDeliveryLocationSchema.safeParse(input);
+  if (!parsed.success)
+    return {
+      error: "Enter a full delivery address and choose a map location.",
+    };
+  try {
+    const actor = await workflowActor();
+    if (actor.role !== "sme")
+      return {
+        error: "Only an SME account can update its delivery location.",
+      };
+    const { address, pin } = parsed.data;
+    if (isDemoMode()) {
+      await localRequest(actor.id, async (tx) => {
+        const { rows } = await tx.query(
+          "update public.profiles set address=$1,latitude=$2,longitude=$3 where id=auth.uid() and role='sme' returning id",
+          [address, pin.latitude, pin.longitude],
+        );
+        if (!rows.length)
+          throw new Error("Could not save this SME delivery location.");
+      });
+    } else {
+      const db = await createClient();
+      const { data, error } = await db
+        .from("profiles")
+        .update({ address, latitude: pin.latitude, longitude: pin.longitude })
+        .eq("id", actor.id)
+        .eq("role", "sme")
+        .select("id")
+        .maybeSingle();
+      if (error || !data)
+        return {
+          error: "Could not save your delivery location. Try again.",
+        };
+    }
+    return { data: await workflowSnapshot(actor, parseWorkspaceQuery(queryInput)) };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not save your delivery location.",
+    };
+  }
 }
 export async function changePassword(
   _previous: { error: string },
@@ -135,7 +198,7 @@ export async function provisionAccount(input: unknown): Promise<{
     username: accountId,
     role: value.role,
     phone: value.phone,
-    address: "",
+    address: value.address,
     latitude: value.pin.latitude,
     longitude: value.pin.longitude,
     branch_id: value.role !== "sme" ? value.branchId || null : null,

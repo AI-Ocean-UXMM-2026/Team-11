@@ -6,8 +6,10 @@ import { Building2, Package, Truck, Plus, ArrowRight } from "lucide-react";
 import { workflowAction } from "@/app/workflow-actions";
 import type { WorkspaceQuery } from "@/lib/workflow/query";
 import type { WorkspaceData, Viewer } from "@/lib/domain";
+import { variantUnit } from "@/lib/checkout";
 import { LocationPicker } from "./location-picker";
 import { locationSchema, pinFromForm } from "@/lib/contact";
+import { statusToneClass } from "@/lib/status-tone";
 
 export function useBranchAction(
   updated: (data: WorkspaceData, message?: string) => void | Promise<void>,
@@ -65,7 +67,7 @@ export function BranchNetwork({
         <div>
           <span>Branch stock</span>
           <strong>
-            {open.reduce((s, b) => s + b.stock, 0)} <small>pairs</small>
+            {open.reduce((s, b) => s + b.stock, 0)} <small>units</small>
           </strong>
         </div>
         <div>
@@ -153,7 +155,7 @@ export function BranchNetwork({
                 <Building2 size={23} />
               </span>
               <span
-                className={`workflow-status ${b.active === false ? "closed" : ""}`}
+                className={`workflow-status ${statusToneClass(b.active === false ? "Closed" : "Open")}`}
               >
                 {b.active === false ? "Closed" : "Open"}
               </span>
@@ -169,7 +171,7 @@ export function BranchNetwork({
                       0,
                     ) ??
                     0}{" "}
-                  <small>pairs available</small>
+                  <small>units available</small>
                 </strong>
               </div>
               <div>
@@ -178,7 +180,7 @@ export function BranchNetwork({
                   {b.backupStock ??
                     b.inventory?.reduce((sum, i) => sum + i.protected, 0) ??
                     0}{" "}
-                  <small>pairs available</small>
+                  <small>units available</small>
                 </strong>
               </div>
             </div>
@@ -190,7 +192,7 @@ export function BranchNetwork({
             <div className="branch-card-metrics">
               <span>
                 <Package size={16} />
-                {b.stock} pairs
+                {b.stock} units
               </span>
               <span>
                 <Truck size={16} />
@@ -256,7 +258,7 @@ export function StockTransfers({
             transfer.status === "shipping" &&
             transfer.destinationBranchId === viewer.branchId,
         )
-      : data.transfers ?? [];
+      : (data.transfers ?? []);
   return (
     <section className="panel stock-transfer-panel">
       <div className="panel-heading">
@@ -294,10 +296,16 @@ export function StockTransfers({
                     {t.source} → {t.destination}
                   </strong>
                   <small>
-                    {t.reference} · {t.variant} · {t.quantity} pairs
+                    {t.reference} · {t.variant} · {t.quantity}{" "}
+                    {variantUnit(t.variant)}
+                    {t.quantity === 1 ? "" : "s"}
                   </small>
                 </span>
-                <span className="workflow-status">{t.status}</span>
+                <span
+                  className={`workflow-status ${statusToneClass(t.status)}`}
+                >
+                  {t.status}
+                </span>
               </summary>
               <p className="muted">{t.reason}</p>
               <p className="inline-note">
@@ -322,7 +330,7 @@ export function StockTransfers({
                 >
                   <label className="workflow-checkbox">
                     <input type="checkbox" required />I confirm all {t.quantity}{" "}
-                    pairs were physically{" "}
+                    units were physically{" "}
                     {action === "transfer_dispatch"
                       ? "dispatched from this location"
                       : "received at this location"}

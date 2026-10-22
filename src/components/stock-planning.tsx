@@ -17,6 +17,7 @@ import {
   type BackupPlanningDetail,
 } from "@/lib/stock-planning";
 import { planningRequest } from "@/lib/stock-planning-client";
+import { statusToneClass } from "@/lib/status-tone";
 import { MonthlyPlanner } from "./stock-planning-versions";
 
 async function readPlanning<T>(
@@ -33,6 +34,8 @@ async function readPlanning<T>(
   return body.data;
 }
 const quantity = (value: number) => value.toLocaleString();
+const planningUnit = (row: BackupPlanningRow) =>
+  row.variant.toLowerCase().includes("piece") ? "piece" : row.unit;
 const date = (value: string | null) =>
   value
     ? new Date(value).toLocaleString("en-GB", {
@@ -100,7 +103,7 @@ export function StockPlanning({
         <label className="field">
           Product / SKU
           <select value={product} onChange={(e) => setProduct(e.target.value)}>
-            <option value="">All STT variants</option>
+            <option value="">All Ocean Pride Longyi styles</option>
             {products.map((r) => (
               <option value={r.productId} key={r.productId}>
                 {r.productName} · {r.variant}
@@ -271,8 +274,8 @@ export function StockPlanning({
               <div className="info-pad">
                 <h2>No matching branch stock</h2>
                 <p>
-                  Choose another filter, or create an active branch and STT SKU
-                  using the existing inventory workflow.
+                  Choose another filter, or create an active branch and Ocean
+                  Pride SKU using the existing inventory workflow.
                 </p>
               </div>
             )}
@@ -435,7 +438,7 @@ function BackupDrawer({
             {area === "refills" ? "backup refill" : "backup plan"}
           </h2>
           <p>
-            {row.productName} · {row.variant} · {row.unit}
+            {row.productName} · {row.variant} · {planningUnit(row)}
           </p>
         </div>
         <button
@@ -476,7 +479,9 @@ function BackupDrawer({
               <section className="backup-drawer-section" id="backup-settings">
                 <div className="backup-section-heading">
                   <h3>HQ settings</h3>
-                  <span className="backup-status unset">
+                  <span
+                    className={`backup-status ${statusToneClass(manualNumbers ? "Manual" : row.source === "ai" || (row.target === null && rec.eligible) ? "AI-assisted" : "Manual")}`}
+                  >
                     {manualNumbers
                       ? "Manual"
                       : row.source === "ai" ||
@@ -487,7 +492,7 @@ function BackupDrawer({
                 </div>
                 <form
                   className="backup-form backup-settings-form"
-                  key={`${row.target}:${row.threshold}:${row.unit}:${row.source}`}
+                  key={`${row.target}:${row.threshold}:${planningUnit(row)}:${row.source}`}
                   onSubmit={(e) => {
                     e.preventDefault();
                     const values = new FormData(e.currentTarget);
@@ -536,7 +541,7 @@ function BackupDrawer({
                         setTargetDraft(event.target.value);
                       }}
                     />
-                    <small>{row.unit}</small>
+                    <small>{planningUnit(row)}</small>
                   </label>
                   <label className="field">
                     Low-stock alert threshold
@@ -564,7 +569,7 @@ function BackupDrawer({
                       pattern="[a-zA-Z][a-zA-Z ]{0,23}"
                       maxLength={24}
                       required
-                      defaultValue={row.unit}
+                      defaultValue={planningUnit(row)}
                     />
                     <small>One inventory count equals one selected unit.</small>
                   </label>
@@ -621,7 +626,7 @@ function BackupDrawer({
                       <p>
                         A suggested target appears after at least three complete
                         observed months, five accepted emergency orders for this
-                        branch and shoe variant, and one completed backup
+                        branch and longyi style, and one completed backup
                         refill. Retail sales are excluded.
                       </p>
                       <p>
@@ -662,31 +667,31 @@ function BackupDrawer({
                     <div>
                       <dt>Backup stock on hand</dt>
                       <dd>
-                        {row.available + row.reserved} {row.unit}
+                        {row.available + row.reserved} {planningUnit(row)}
                       </dd>
                     </div>
                     <div>
                       <dt>Reserved for takeovers</dt>
                       <dd>
-                        {row.reserved} {row.unit}
+                        {row.reserved} {planningUnit(row)}
                       </dd>
                     </div>
                     <div>
                       <dt>Available backup</dt>
                       <dd>
-                        {row.available} {row.unit}
+                        {row.available} {planningUnit(row)}
                       </dd>
                     </div>
                     <div>
                       <dt>In transit to branch</dt>
                       <dd>
-                        {row.incoming} {row.unit}
+                        {row.incoming} {planningUnit(row)}
                       </dd>
                     </div>
                     <div>
                       <dt>Proposed refill</dt>
                       <dd>
-                        {row.proposedRefill ?? "—"} {row.unit}
+                        {row.proposedRefill ?? "—"} {planningUnit(row)}
                       </dd>
                     </div>
                   </dl>
@@ -725,7 +730,7 @@ function BackupDrawer({
                         disabled={busy || !row.proposedRefill}
                       >
                         <PackagePlus size={17} /> Create refill ·{" "}
-                        {row.proposedRefill ?? 0} {row.unit}
+                        {row.proposedRefill ?? 0} {planningUnit(row)}
                       </button>
                     </form>
                   )}
@@ -740,12 +745,14 @@ function BackupDrawer({
                     <article className="backup-history-card" key={t.id}>
                       <div className="backup-section-heading">
                         <strong>{t.reference}</strong>
-                        <span className="backup-status unset">
+                        <span
+                          className={`backup-status ${statusToneClass(t.status === "shipping" ? "In transit" : t.status)}`}
+                        >
                           {t.status === "shipping" ? "In transit" : t.status}
                         </span>
                       </div>
                       <p>
-                        {t.quantity} {row.unit} · {date(t.createdAt)}
+                        {t.quantity} {planningUnit(row)} · {date(t.createdAt)}
                       </p>
                       {t.status === "reserved" && (
                         <form

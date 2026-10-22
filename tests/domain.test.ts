@@ -63,7 +63,7 @@ describe("account inputs", () => {
     expect(
       accountSchema.parse({ ...valid, password: "short" }),
     ).not.toHaveProperty("password");
-    expect(accountSchema.parse(valid)).not.toHaveProperty("address");
+    expect(accountSchema.parse(valid).address).toBe("Hlaing, Yangon");
     expect(
       accountSchema.safeParse({ ...valid, branchId: "invalid" }).success,
     ).toBe(false);

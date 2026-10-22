@@ -33,7 +33,7 @@ beforeEach(() => {
         orderId: `order-${i}`,
         attemptId: `attempt-${i}`,
         position: i,
-        reference: `STT-${i}`,
+        reference: `OPL-${i}`,
         business: `Shop ${i}`,
         pairs: 2,
         status: i === 3 ? "Preparing" : "Shipping",
@@ -138,7 +138,7 @@ async function click(text: string) {
 async function check(i: number) {
   await act(async () =>
     host
-      .querySelector<HTMLInputElement>(`[aria-label="Collected STT-${i}"]`)!
+      .querySelector<HTMLInputElement>(`[aria-label="Collected OPL-${i}"]`)!
       .click(),
   );
 }
@@ -151,7 +151,7 @@ it("accepts without GPS, then starts one publisher only for explicitly checked p
   expect(mocks.begin).not.toHaveBeenCalled();
   expect(button("Confirm pickup & start route").disabled).toBe(true);
   expect(
-    host.querySelector<HTMLInputElement>('[aria-label="Collected STT-3"]')!
+    host.querySelector<HTMLInputElement>('[aria-label="Collected OPL-3"]')!
       .disabled,
   ).toBe(true);
   await check(2);
@@ -161,7 +161,7 @@ it("accepts without GPS, then starts one publisher only for explicitly checked p
   expect(mocks.begin).toHaveBeenCalledWith({
     orderId: "order-2",
     attemptId: "attempt-2",
-    reference: "STT-2",
+    reference: "OPL-2",
     viewerId: "driver",
     demo: true,
   });

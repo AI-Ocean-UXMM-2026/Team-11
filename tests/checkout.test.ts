@@ -2,7 +2,10 @@ import { expect, it } from "vitest";
 import { cartError, cartLines } from "../src/lib/checkout";
 import { demoData } from "../src/lib/demo-data";
 
-const products = demoData.products;
+const products = demoData.products.map((product) => ({
+  ...product,
+  stock: 100,
+}));
 const first = products[0];
 it("keeps the size/color variants and line prices in cart review", () => {
   const second = products.find((p) => p.color !== first.color)!;
@@ -16,7 +19,7 @@ it("keeps the size/color variants and line prices in cart review", () => {
   );
 });
 it("blocks checkout for empty, discontinued, fractional, odd and over-stock carts", () => {
-  expect(cartError(products, {})).toMatch(/Add sneakers/);
+  expect(cartError(products, {})).toMatch(/Add products/);
   expect(cartError(products, { missing: 2 })).toMatch(/no longer/);
   for (const quantity of [1, 2.5, 3])
     expect(cartError(products, { [first.id]: quantity })).toMatch(/multiples/);

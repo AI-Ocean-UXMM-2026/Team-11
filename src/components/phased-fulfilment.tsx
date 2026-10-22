@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Branch, Order, Viewer } from "@/lib/domain";
+import { metresBetween } from "@/lib/routing";
 
 export function PhasedFulfilment({
   order,
@@ -21,15 +22,59 @@ export function PhasedFulfilment({
   const [source, setSource] = useState("");
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
-  const sourceBranch = branches.find((b) => b.id === source);
+  const [returnedConsignmentConfirmed, setReturnedConsignmentConfirmed] =
+    useState(false);
   const lines =
     progress?.lines ??
     w.lines.map((l) => ({ ...l, ordered: l.quantity, received: 0 }));
   const outstanding = lines
     .map((l) => ({ ...l, remaining: l.ordered - l.received }))
     .filter((l) => l.remaining > 0);
+  const activeBranches = branches.filter((branch) => branch.active !== false);
+  const branchBackup = (branch: Branch) =>
+    outstanding.reduce(
+      (total, line) =>
+        total +
+        Math.min(
+          line.remaining,
+          branch.inventory?.find((item) => item.productId === line.productId)
+            ?.protected ?? 0,
+        ),
+      0,
+    );
+  const branchesWithBackup = activeBranches.filter(
+    (branch) => branchBackup(branch) > 0,
+  );
+  // Proximity is the primary recommendation. Backup only determines whether a
+  // branch can contribute; the selected quantity determines full vs phased.
+  const recommendedBranch = order.pin
+    ? [...branchesWithBackup].sort((a, b) => {
+        if (a.pin && b.pin) {
+          return (
+            metresBetween(order.pin!, a.pin) - metresBetween(order.pin!, b.pin)
+          );
+        }
+        if (a.pin) return -1;
+        if (b.pin) return 1;
+        return (
+          branchBackup(b) - branchBackup(a) || a.name.localeCompare(b.name)
+        );
+      })[0]
+    : [...branchesWithBackup].sort(
+        (a, b) =>
+          branchBackup(b) - branchBackup(a) || a.name.localeCompare(b.name),
+      )[0];
+  const recommendedSource = recommendedBranch?.id ?? "hq";
+  const selectedSource = source || recommendedSource;
+  const sourceBranch = branches.find((b) => b.id === selectedSource);
+  useEffect(() => {
+    setSource("");
+    setQuantities({});
+    setReason("");
+    setReturnedConsignmentConfirmed(false);
+  }, [order.id]);
   const availability = (id: string, remaining: number) =>
-    source === "hq"
+    selectedSource === "hq"
       ? remaining
       : (sourceBranch?.inventory?.find((i) => i.productId === id)?.protected ??
         0);
@@ -42,6 +87,32 @@ export function PhasedFulfilment({
       ),
     }))
     .filter((l) => l.quantity > 0);
+  const phaseQuantity = selected.reduce(
+    (total, line) => total + line.quantity,
+    0,
+  );
+  const stockCoversFullOrder =
+    selectedSource === "hq" ||
+    (!!selectedSource &&
+      outstanding.every(
+        (line) =>
+          availability(line.productId, line.remaining) >= line.remaining,
+      ));
+  const canDeliverInOneTrip =
+    stockCoversFullOrder &&
+    outstanding.every(
+      (line) =>
+        Number(
+          quantities[line.productId] ??
+            Math.min(
+              line.remaining,
+              availability(line.productId, line.remaining),
+            ),
+        ) === line.remaining,
+    );
+  const defaultPhaseReason = canDeliverInOneTrip
+    ? `Full delivery planned from ${selectedSource === "hq" ? "HQ" : (sourceBranch?.name ?? "the selected branch")} for ${phaseQuantity} pairs.`
+    : `${selectedSource === "hq" ? "HQ" : (sourceBranch?.name ?? "The selected branch")} phase planned for ${phaseQuantity} pairs.`;
   const valid =
     selected.length > 0 &&
     outstanding.every((l) => {
@@ -57,16 +128,28 @@ export function PhasedFulfilment({
     });
   const phaseNumber = (progress?.history.at(-1)?.number ?? 0) + 1;
   const status = progress?.deliveryStatus ?? order.status;
+  const priorRecoveryReady =
+    !!w.replacementRequired && !w.handoffPending && !progress;
+  const dispatchedRecovery =
+    !!w.dispatched &&
+    !!w.issue &&
+    !w.handoffPending &&
+    !progress &&
+    status === "On hold";
+  const recoveryReady = priorRecoveryReady || dispatchedRecovery;
+  const recoveryConfirmed =
+    !dispatchedRecovery || priorRecoveryReady || returnedConsignmentConfirmed;
   const canPlan =
     viewer.role === "hq" &&
     !current &&
     w.paymentVerified &&
     w.reserved &&
     !w.sourceBranchId &&
-    !w.dispatched &&
-    !w.handoffPending &&
-    !w.issue &&
-    ["Confirmed", "Preparing"].includes(status);
+    (!w.issue || recoveryReady) &&
+    ((!w.dispatched &&
+      !w.handoffPending &&
+      ["Confirmed", "Preparing"].includes(status)) ||
+      dispatchedRecovery);
   if (!progress && !canPlan) return null;
   return (
     <section
@@ -147,105 +230,128 @@ export function PhasedFulfilment({
             Plan phase {phaseNumber}
             {progress ? ` · ${progress.remaining} pairs outstanding` : ""}
           </summary>
-          <p className="muted">
-            Choose the source and quantities for this delivery. A branch can
-            supply part of the order from its available wholesale backup stock.
-            Undelivered pairs remain reserved at HQ; the price and payment stay
-            unchanged.
-          </p>
           <label className="field">
             Fulfilment source
             <select
-              value={source}
+              value={selectedSource}
               disabled={pending}
               onChange={(e) => {
                 setSource(e.target.value);
                 setQuantities({});
               }}
             >
-              <option value="">Choose HQ or an open branch</option>
-              <option value="hq">STT Yangon HQ</option>
-              {branches
-                .filter((b) => b.active !== false)
-                .map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
+              <option value="hq">Ocean Pride Longyi HQ</option>
+              {activeBranches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
             </select>
           </label>
-          {source && (
-            <div className="phase-quantity-list">
-              {outstanding.map((l) => {
-                const max = Math.min(
-                  l.remaining,
-                  availability(l.productId, l.remaining),
-                );
-                return (
-                  <label key={l.productId} className="phase-quantity">
-                    <span>
-                      <strong>
-                        {l.name} · {l.variant}
-                      </strong>
-                      <small>
-                        {l.remaining} outstanding · {max} available for this
-                        phase
-                      </small>
-                    </span>
-                    <span>
-                      <span className="sr-only">
-                        Phase pairs for {l.variant}
+          {selectedSource && (
+            <>
+              <div className="inline-note phase-recommendation" role="status">
+                <strong>
+                  {canDeliverInOneTrip
+                    ? "Full delivery"
+                    : `Phased delivery · ${phaseQuantity} pairs`}
+                </strong>
+              </div>
+              <div className="phase-quantity-list">
+                {outstanding.map((l) => {
+                  const max = Math.min(
+                    l.remaining,
+                    availability(l.productId, l.remaining),
+                  );
+                  return (
+                    <label key={l.productId} className="phase-quantity">
+                      <span>
+                        <strong>
+                          {l.name} · {l.variant}
+                        </strong>
+                        <small>
+                          {l.remaining} outstanding · {max} available for this
+                          phase
+                        </small>
                       </span>
-                      <input
-                        aria-label={`Phase pairs for ${l.variant}`}
-                        type="number"
-                        min="0"
-                        max={max}
-                        step="1"
-                        value={quantities[l.productId] ?? max}
-                        disabled={pending}
-                        onChange={(e) =>
-                          setQuantities((previous) => ({
-                            ...previous,
-                            [l.productId]: e.target.value,
-                          }))
-                        }
-                      />
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
+                      <span>
+                        <span className="sr-only">
+                          Phase pairs for {l.variant}
+                        </span>
+                        <input
+                          aria-label={`Phase pairs for ${l.variant}`}
+                          type="number"
+                          min="0"
+                          max={max}
+                          step="1"
+                          value={quantities[l.productId] ?? max}
+                          disabled={pending}
+                          onChange={(e) =>
+                            setQuantities((previous) => ({
+                              ...previous,
+                              [l.productId]: e.target.value,
+                            }))
+                          }
+                        />
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          {dispatchedRecovery && !priorRecoveryReady && (
+            <label className="workflow-checkbox">
+              <input
+                type="checkbox"
+                checked={returnedConsignmentConfirmed}
+                disabled={pending}
+                onChange={(event) =>
+                  setReturnedConsignmentConfirmed(event.target.checked)
+                }
+              />
+              I confirm all originally dispatched pairs were physically returned
+              to HQ.
+            </label>
           )}
           <label className="field">
-            Phase reason
+            Phase reason (optional)
             <textarea
               value={reason}
               maxLength={500}
               disabled={pending}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="For example: branch supplies available pairs; HQ delivers the remaining pairs next."
+              placeholder="Add an internal note (optional)"
             />
           </label>
           <p className="muted">
-            {selected.reduce((n, l) => n + l.quantity, 0)} pairs in phase{" "}
-            {phaseNumber}
+            {phaseQuantity} pairs in{" "}
+            {canDeliverInOneTrip ? "full delivery" : `phase ${phaseNumber}`}
           </p>
           <button
             type="button"
             className="button primary"
-            disabled={pending || !source || !valid || reason.trim().length < 3}
+            disabled={
+              pending || !selectedSource || !valid || !recoveryConfirmed
+            }
             onClick={() =>
               act("phase_request", {
-                branchId: source === "hq" ? null : source,
+                branchId: selectedSource === "hq" ? null : selectedSource,
                 lines: selected,
-                reason,
+                reason: reason.trim() || defaultPhaseReason,
+                ...(dispatchedRecovery && !priorRecoveryReady
+                  ? { returnedConsignmentConfirmed: true }
+                  : {}),
               })
             }
           >
-            {source === "hq"
-              ? "Reserve phase at HQ"
-              : "Request branch acceptance for this phase"}
+            {selectedSource === "hq"
+              ? canDeliverInOneTrip
+                ? "Reserve full delivery at HQ"
+                : `Reserve HQ phase · ${phaseQuantity} pairs`
+              : canDeliverInOneTrip
+                ? "Request full branch delivery"
+                : `Request branch phase · ${phaseQuantity} pairs`}
           </button>
         </details>
       )}

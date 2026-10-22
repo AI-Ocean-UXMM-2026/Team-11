@@ -132,18 +132,18 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #a66a15;
+  background: #717171;
   color: white;
   font-size: 13px;
   font-weight: 700;
 }
 .stop-badge.own {
-  background: #17674f;
+  background: #545454;
 }
 .route-stop-summary {
   grid-column: 1 / -1;
   padding: 14px;
-  background: var(--sage-light, #f0f5ee);
+  background: var(--sage-light, #f3f3f3);
   border-radius: 10px;
   margin-bottom: 14px;
 }
@@ -161,10 +161,25 @@
   top: 5px;
   left: 50%;
   transform: translateX(-50%);
-  color: #1c302b;
+  color: #2b2b2b;
   font-size: 13px;
   font-weight: 800;
   pointer-events: none;
+}
+.location-map-marker {
+  width: 36px;
+  height: 44px;
+  color: var(--location-marker-color, #2563eb);
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 28%));
+  cursor: grab;
+}
+.location-map-marker:active {
+  cursor: grabbing;
+}
+.location-map-marker svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 @media (max-width: 760px) {
   .group-planner-grid {
@@ -190,9 +205,9 @@
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 12px;
   padding: 18px;
-  border: 1px solid #dce5dc;
+  border: 1px solid #e2e2e2;
   border-radius: 12px;
-  background: #f1f6ee;
+  background: #f4f4f4;
 }
 .route-metrics small {
   display: flex;
@@ -217,15 +232,15 @@
   align-items: flex-start;
   gap: 12px;
   padding: 16px;
-  border-left: 3px solid #2868b2;
-  background: #edf3fa;
+  border-left: 3px solid #606060;
+  background: #f2f2f2;
   border-radius: 8px;
   margin: 14px 0;
 }
 .route-next-direction svg {
   flex-shrink: 0;
   margin-top: 3px;
-  color: #2868b2;
+  color: #606060;
 }
 .route-next-direction small,
 .route-next-direction strong,
@@ -233,7 +248,7 @@
   display: block;
 }
 .route-next-direction small {
-  color: #53667b;
+  color: #636363;
   font-size: 11px;
   margin-bottom: 4px;
 }
@@ -261,9 +276,9 @@
   padding: 10px 14px;
 }
 .route-map-controls [aria-pressed="true"] {
-  background: #e6eff9;
-  border-color: #2868b2;
-  color: #205795;
+  background: #eeeeee;
+  border-color: #606060;
+  color: #505050;
 }
 .driver-road-route .location-map {
   height: 360px;
@@ -316,11 +331,12 @@
 .delivery-screen-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0;
   color: var(--forest);
-  font-size: 20px;
-  font-weight: 800;
   text-decoration: none;
+}
+.delivery-screen-brand .brand-logo {
+  width: 144px;
 }
 .delivery-screen-title {
   margin: 18px 0;

@@ -32,7 +32,7 @@ export async function seedDemoPlanningHistory(tx: Transaction) {
     create temporary table backup_history_fixture on commit drop as
     select x.*,md5('backup-history-order-v1:'||fixture_key)::uuid order_id,
       md5('backup-history-handoff-v1:'||fixture_key)::uuid handoff_id,
-      ('STT-'||to_char(period,'YYYYMM')||'-'||upper(substr(md5(fixture_key),1,10))) reference,
+      ('OPL-'||to_char(period,'YYYYMM')||'-'||upper(substr(md5(fixture_key),1,10))) reference,
       (period::timestamp+interval '8 days 9 hours'+seq*interval '10 days') at time zone 'Asia/Yangon' requested_at
     from (
       select b.id branch_id,b.name branch_name,p.id product_id,p.name product_name,p.pack,

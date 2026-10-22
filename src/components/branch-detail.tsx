@@ -11,8 +11,9 @@ import { Building2, PackagePlus, Pencil, RefreshCw, X } from "lucide-react";
 import type { WorkspaceData, Viewer } from "@/lib/domain";
 import type { BranchHistory } from "@/lib/branch-history";
 import type { BackupPlanningDetail } from "@/lib/stock-planning";
-import { productPhoto } from "@/lib/checkout";
+import { productPhoto, productUnit } from "@/lib/checkout";
 import { locationSchema, pinFromForm } from "@/lib/contact";
+import { statusToneClass } from "@/lib/status-tone";
 import { LocationLink } from "./location-link";
 import { LocationPicker } from "./location-picker";
 import { Pagination } from "./pagination";
@@ -195,7 +196,9 @@ export function BranchDetail({
             </span>
             <div>
               <h2 id="branch-info-heading">Branch information</h2>
-              <span className={`workflow-status ${open ? "" : "closed"}`}>
+              <span
+                className={`workflow-status ${statusToneClass(open ? "Open" : "Closed")}`}
+              >
                 {open ? "Open" : "Closed"}
               </span>
             </div>
@@ -260,12 +263,12 @@ export function BranchDetail({
             <h2 id="branch-stock-heading">Stock units</h2>
             <p className="muted">
               Retail sales and emergency wholesale deliveries use separate stock
-              pools. Allocated pairs are already committed to an order or
+              pools. Allocated units are already committed to an order or
               transfer.
             </p>
           </div>
           <strong className="branch-total-stock">
-            {branch.stock.toLocaleString()} <small>pairs on hand</small>
+            {branch.stock.toLocaleString()} <small>units on hand</small>
           </strong>
         </div>
         <div className="table-scroll">
@@ -290,17 +293,15 @@ export function BranchDetail({
                       <div className="branch-stock-product">
                         {p && (
                           <Image
-                            src={productPhoto(p.color)}
-                            alt={`${p.color} sneaker`}
+                            src={productPhoto(p)}
+                            alt={`${p.name}, ${p.pack}`}
                             width={60}
                             height={48}
                           />
                         )}
                         <span>
-                          <strong>{p?.name ?? "STT Everyday sneaker"}</strong>
-                          <small>
-                            {p ? `${p.color} · EU ${p.size}` : i.variant}
-                          </small>
+                          <strong>{p?.name ?? "Product"}</strong>
+                          <small>{p ? p.pack : i.variant}</small>
                         </span>
                       </div>
                     </td>
@@ -444,7 +445,7 @@ export function BranchDetail({
                   quantity > available
                 ) {
                   setError(
-                    "Enter a whole number of pairs within the available source stock.",
+                    "Enter a whole number within the available source stock.",
                   );
                   return;
                 }
@@ -465,8 +466,8 @@ export function BranchDetail({
             >
               <p className="muted">
                 {direction === "return"
-                  ? `${branch.name} → STT Yangon HQ`
-                  : `STT Yangon HQ → ${branch.name}`}
+                  ? `${branch.name} → Ocean Pride Longyi HQ`
+                  : `Ocean Pride Longyi HQ → ${branch.name}`}
               </p>
               <label className="field">
                 Stock movement
@@ -529,7 +530,7 @@ export function BranchDetail({
                   </p>
                 ))}
               <label className="field">
-                Shoe variant
+                Longyi style
                 <select
                   value={productId}
                   onChange={(e) => {
@@ -540,12 +541,13 @@ export function BranchDetail({
                 >
                   {data.products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.color} sneaker · EU {p.size}
+                      {p.name} · {p.pack}
                     </option>
                   ))}
                 </select>
                 <small>
-                  {available.toLocaleString()} pairs available at{" "}
+                  {available.toLocaleString()}{" "}
+                  {product ? `${productUnit(product)}s` : "units"} available at{" "}
                   {direction === "return" ? branch.name : "HQ"}
                 </small>
               </label>
@@ -590,7 +592,7 @@ export function BranchDetail({
                 transfer history; the destination confirms physical receipt
                 before its stock increases.
                 {purpose === "backup" &&
-                  " Branch receipt adds these pairs directly to the dedicated wholesale backup pool."}
+                  " Branch receipt adds these units directly to the dedicated wholesale backup pool."}
               </p>
               {failure}
               <div className="modal-actions">

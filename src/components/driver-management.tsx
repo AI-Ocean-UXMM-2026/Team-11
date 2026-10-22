@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { Search, Truck } from "lucide-react";
 import { workflowAction } from "@/app/workflow-actions";
 import type { Account, WorkspaceData } from "@/lib/domain";
+import { statusToneClass } from "@/lib/status-tone";
 
 type Props = {
   data: WorkspaceData;
@@ -15,7 +16,7 @@ function assignedLocation(driver: Account, data: WorkspaceData) {
     ? (data.branches.find((branch) => branch.id === driver.branchId)?.name ??
         driver.branchName ??
         driver.affiliation)
-    : "STT Yangon HQ";
+    : "Ocean Pride Longyi HQ";
 }
 
 export function DriverManagement({ data, updated }: Props) {
@@ -65,7 +66,7 @@ export function DriverManagement({ data, updated }: Props) {
               aria-label="Filter drivers by branch"
             >
               <option value="">All branches</option>
-              <option value="__hq__">STT Yangon HQ</option>
+              <option value="__hq__">Ocean Pride Longyi HQ</option>
               {data.branches.map((branch) => (
                 <option key={branch.id} value={branch.id}>
                   {branch.name}
@@ -98,7 +99,11 @@ export function DriverManagement({ data, updated }: Props) {
                     </td>
                     <td>{assignedLocation(driver, data)}</td>
                     <td>
-                      <span className="workflow-status">{driver.status}</span>
+                      <span
+                        className={`workflow-status ${statusToneClass(driver.status)}`}
+                      >
+                        {driver.status}
+                      </span>
                     </td>
                     <td>
                       <button
@@ -230,7 +235,7 @@ function DriverAffiliation({
             disabled={pending}
             onChange={(event) => setBranchId(event.target.value)}
           >
-            <option value="">STT Yangon HQ</option>
+            <option value="">Ocean Pride Longyi HQ</option>
             {closedBranch && (
               <option value={driver.branchId!} disabled>
                 {assignedLocation(driver, data)} (closed)

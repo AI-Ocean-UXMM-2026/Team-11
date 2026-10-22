@@ -236,7 +236,7 @@ it("adds genuine takeover evidence and weights real refill lead times by receipt
     const order = randomUUID();
     await db.query(
       `insert into public.orders(id,reference,sme_id,business_name,destination,receiver_name,receiver_phone,item_count,merchandise_total,shipping_total)
-      values($1,'STT-real',$2,'Shop','Yangon','Receiver','09123456789',9,0,0)`,
+      values($1,'OPL-real',$2,'Shop','Yangon','Receiver','09123456789',9,0,0)`,
       [order, buyer],
     );
     await db.query(

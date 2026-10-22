@@ -93,7 +93,7 @@ export function WorkflowAdmin({
         <h2>
           {mode === "settings"
             ? "Delivery & payment setup"
-            : "Adjust STT stock or price"}
+            : "Adjust Ocean Pride Longyi stock or price"}
         </h2>
       </div>
       <form
@@ -251,7 +251,7 @@ export function WorkflowAdmin({
             <label className="field">
               Stock location
               <select name="branchId">
-                <option value="">STT Yangon HQ</option>
+                <option value="">Ocean Pride Longyi HQ</option>
                 {data.branches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
@@ -261,7 +261,7 @@ export function WorkflowAdmin({
             </label>
             <div className="form-grid">
               <label className="field">
-                New on-hand pairs
+                New on-hand units
                 <input
                   type="number"
                   name="onHand"
@@ -288,7 +288,7 @@ export function WorkflowAdmin({
               <textarea name="reason" minLength={3} maxLength={1000} required />
             </label>
             <p className="muted">
-              Stock counts cannot consume protected or allocated pairs. Price
+              Stock counts cannot consume protected or allocated units. Price
               adjustments apply to new quotes.
             </p>
           </>

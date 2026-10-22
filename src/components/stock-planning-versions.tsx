@@ -6,6 +6,7 @@ import { Sparkles, ShieldCheck, Package, RefreshCw } from "lucide-react";
 import { nextPlanningMonth, type PlanningSnapshot } from "@/lib/stock-planning";
 import { businessDate, type Viewer, type WorkspaceData } from "@/lib/domain";
 import { planningRequest } from "@/lib/stock-planning-client";
+import { variantUnit } from "@/lib/checkout";
 
 export function MonthlyPlanner({
   branchId,
@@ -171,7 +172,7 @@ export function MonthlyPlanner({
           <section className="stat-card" key={label}>
             <span className="muted">{label}</span>
             <strong>
-              {Number(value).toLocaleString()} <small>pairs</small>
+              {Number(value).toLocaleString()} <small>units</small>
             </strong>
             {unresolved &&
               (label === "Monthly target" || label === "Additional refill") && (
@@ -248,7 +249,7 @@ export function MonthlyPlanner({
           <div className="table-scroll">
             <table className="planning-table">
               <caption className="sr-only">
-                Current planning inputs and target overrides by shoe variant
+                Current planning inputs and target overrides by product style
               </caption>
               <thead>
                 <tr>
@@ -282,11 +283,11 @@ export function MonthlyPlanner({
                         >
                           {r.baseline === null
                             ? "Insufficient history"
-                            : `Baseline: ${r.baseline} pairs`}
+                            : `Baseline: ${r.baseline} ${variantUnit(r.variant)}s`}
                         </span>
                       </td>
                       <td>
-                        {r.backupUnits} pairs
+                        {r.backupUnits} {variantUnit(r.variant)}s
                         <small>
                           Accepted / stock-shortage demand · counted once
                         </small>
@@ -370,7 +371,7 @@ export function MonthlyPlanner({
             <p className="muted">
               Generating saves a new draft. No stock changes until HQ approves.
               Estimates use demand ÷ 3 × (1 + buffer), rounded up to whole
-              pairs.
+              units.
             </p>
             <button className="button primary" disabled={busy || query.isError}>
               Generate new plan version
@@ -576,7 +577,8 @@ export function MonthlyPlanner({
             >
               <div>
                 <strong>
-                  {t.variant} · {t.quantity} pairs
+                  {t.variant} · {t.quantity} {variantUnit(t.variant)}
+                  {t.quantity === 1 ? "" : "s"}
                 </strong>
                 <small>{t.reference}</small>
               </div>
@@ -614,7 +616,7 @@ export function MonthlyPlanner({
           </p>
           {snapshot.unmet.map((u) => (
             <p key={u.orderId}>
-              {u.reference} · {u.units} pairs · {u.reason}
+              {u.reference} · {u.units} units · {u.reason}
             </p>
           ))}
         </div>

@@ -11,7 +11,7 @@ export default function Login() {
   return (
     <AuthLayout>
       <div className="portal-picker">
-        <span className="auth-brand-label">STT footwear supplier</span>
+        <span className="auth-brand-label">Ocean Pride Longyi supplier</span>
         <h1>Your work starts here.</h1>
         <p>
           Choose your portal and use the credentials provided by headquarters.
@@ -20,7 +20,7 @@ export default function Login() {
           {
             role: "sme",
             title: "SME portal",
-            text: "Browse STT shoes, place orders and track deliveries.",
+            text: "Browse Ocean Pride Longyi, place orders and track deliveries.",
             icon: Store,
           },
           {

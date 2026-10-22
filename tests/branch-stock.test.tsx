@@ -12,8 +12,10 @@ const onSearch = vi.fn();
 const product = {
   ...demoData.products[0],
   id: "white-40",
+  category: "Longyi",
   color: "White",
   size: "40",
+  pack: "White · EU 40 · 1 pair",
   stock: 9000,
   reserve: 0,
 };
@@ -21,7 +23,13 @@ const data: WorkspaceData = {
   ...demoData,
   products: [
     product,
-    { ...product, id: "black-38", color: "Black", size: "38" },
+    {
+      ...product,
+      id: "black-38",
+      color: "Black",
+      size: "38",
+      pack: "Black · EU 38 · 1 pair",
+    },
   ],
   branches: [
     {
@@ -88,11 +96,11 @@ it("separates available stock from committed deliveries and wholesale backup for
       .slice(1)
       .map((cell) => cell.textContent),
   ).toEqual([
-    "50 pairsIn stock",
-    "20 pairs",
-    "30 pairs",
-    "10 pairs",
-    "60 pairs",
+    "50 piecesIn stock",
+    "20 pieces",
+    "30 pieces",
+    "10 pieces",
+    "60 pieces",
   ]);
   expect(rows[1].textContent).toContain("Out of stock");
   expect(host.textContent).not.toContain("8888");
@@ -103,12 +111,12 @@ it("separates available stock from committed deliveries and wholesale backup for
   );
   expect(refresh).toHaveBeenCalledOnce();
 });
-it("searches variants without changing branch-wide totals", async () => {
+it("searches styles without changing branch-wide totals", async () => {
   await render("black 38");
   expect(host.querySelectorAll("tbody tr")).toHaveLength(1);
   expect(host.querySelector("tbody")?.textContent).toContain("Black · EU 38");
   expect(host.querySelector("dl")?.textContent).toContain(
-    "Available pairs50 pairs",
+    "Available stock50 pieces",
   );
   await render("missing size");
   expect(host.textContent).toContain("No matching products");

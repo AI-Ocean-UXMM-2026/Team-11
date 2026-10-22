@@ -126,6 +126,7 @@ export interface Order {
 }
 export interface Product {
   id: string;
+  sku?: string;
   name: string;
   category: string;
   pack: string;
@@ -134,6 +135,7 @@ export interface Product {
   reserve: number;
   minimum: number;
   tone: string;
+  imagePath?: string;
   brand: string;
   size: string;
   color: string;
@@ -170,6 +172,7 @@ export interface Account {
   role: Role;
   status: string;
   affiliation: string;
+  address?: string;
   branchId?: string | null;
   branchName?: string;
   phone?: string;
@@ -222,6 +225,11 @@ export interface WorkspaceData {
   accounts: Account[];
   retailSales: RetailSale[];
   settings?: { shipping: number | null; instructions: string; area: string };
+  profile?: {
+    phone: string;
+    address: string;
+    pin: { latitude: number; longitude: number } | null;
+  };
   workflowEnabled?: boolean;
   transfers?: {
     purpose?: "retail" | "backup";
@@ -263,6 +271,7 @@ export const accountSchema = z
     role: z.enum(["sme", "driver", "branch"]),
     phone: z.string().trim().min(6).max(30),
     phoneCountry: z.string().default("MM"),
+    address: z.string().trim().max(300).default(""),
     pin: locationSchema,
     branchId: z.union([z.literal(""), z.uuid()]).optional(),
   })
@@ -284,6 +293,12 @@ export const accountSchema = z
         code: "custom",
         path: ["branchId"],
         message: "SME accounts cannot belong to a supplier branch.",
+      });
+    if (value.role === "sme" && value.address.length < 5)
+      context.addIssue({
+        code: "custom",
+        path: ["address"],
+        message: "Enter the SME's full delivery address.",
       });
   })
   .transform((value) => ({

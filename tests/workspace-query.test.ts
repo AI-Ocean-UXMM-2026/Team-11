@@ -145,9 +145,9 @@ it("invalidates inactive pages after a mutation without changing another viewer'
 });
 
 it("keys caches by viewer, role, mode, page and filters", () => {
-  const key = workspaceKey(scope, { ordersPage: 2, search: "shoes" });
+  const key = workspaceKey(scope, { ordersPage: 2, search: "longyi" });
   expect(key).not.toEqual(
-    workspaceKey(scope, { ordersPage: 1, search: "shoes" }),
+    workspaceKey(scope, { ordersPage: 1, search: "longyi" }),
   );
   expect(key).not.toEqual(
     workspaceKey(scope, { ordersPage: 2, search: "other" }),
@@ -155,13 +155,13 @@ it("keys caches by viewer, role, mode, page and filters", () => {
   expect(key).not.toEqual(
     workspaceKey(workspaceScope({ id: "hq-one", role: "driver" }, true), {
       ordersPage: 2,
-      search: "shoes",
+      search: "longyi",
     }),
   );
   expect(key).not.toEqual(
     workspaceKey(workspaceScope({ id: "hq-one", role: "hq" }, false), {
       ordersPage: 2,
-      search: "shoes",
+      search: "longyi",
     }),
   );
 });

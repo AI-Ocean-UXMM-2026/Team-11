@@ -4,6 +4,7 @@ import {
   workflowSnapshot,
   WorkflowError,
   parseWorkspaceQuery,
+  presentPortalData,
 } from "@/lib/workflow/server";
 const actions = new Set([
   "phase_request",
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
     const result = await executeWorkflow(actor, action, payload, key);
     return Response.json(
       {
-        result,
+        result: presentPortalData(result),
         data: await workflowSnapshot(actor, {
           ...query,
           orderId: query.orderId ?? result.orderId,

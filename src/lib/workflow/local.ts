@@ -95,6 +95,8 @@ async function applyMigrations(db: PGlite) {
     "20261022212016_branch_physical_stock_movements.sql",
     "20261022230000_branch_confirmed_backup_incoming.sql",
     "20261023000100_branch_received_movement_records.sql",
+    "20261023030000_sme_saved_delivery_location.sql",
+    "20261023040000_phase_returned_hq_consignment.sql",
   ]) {
     const done = await db.query(
       "select 1 from public.workflow_migrations where name=$1",
@@ -239,7 +241,7 @@ export async function localRequest<T>(
               status,
               user.mustChangePassword,
               user.phone,
-              user.affiliation,
+              user.address ?? "",
               affiliation,
               user.pin?.latitude ?? null,
               user.pin?.longitude ?? null,

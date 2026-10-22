@@ -1,5 +1,9 @@
 import { deliveryRoadRoute } from "@/lib/workflow/routing";
-import { workflowActor, WorkflowError } from "@/lib/workflow/server";
+import {
+  presentPortalData,
+  workflowActor,
+  WorkflowError,
+} from "@/lib/workflow/server";
 const headers = { "Cache-Control": "private, no-store" };
 export async function GET(
   request: Request,
@@ -11,7 +15,7 @@ export async function GET(
       (await context.params).id,
       `${new URL(request.url).origin}/`,
     );
-    return Response.json({ data }, { headers });
+    return Response.json({ data: presentPortalData(data) }, { headers });
   } catch (error) {
     return Response.json(
       {

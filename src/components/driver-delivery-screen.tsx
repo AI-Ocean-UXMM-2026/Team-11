@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
-import { ArrowLeft, Boxes } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import type { Viewer } from "@/lib/domain";
 import { DeliveryTracking } from "./delivery-tracking";
+import { BrandLogo } from "./brand-logo";
 
 export function DriverDeliveryScreen({
   viewer,
@@ -23,7 +24,7 @@ export function DriverDeliveryScreen({
           <ArrowLeft size={18} /> Back to order
         </Link>
         <Link href="/driver" className="delivery-screen-brand">
-          <Boxes size={23} /> SupplyLink
+          <BrandLogo className="brand-logo" />
         </Link>
       </header>
       <div className="delivery-screen-title">

@@ -1,5 +1,6 @@
 "use client";
 import { LocationLink } from "./location-link";
+import { BrandLogo } from "./brand-logo";
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -64,6 +65,7 @@ import {
 } from "@/lib/domain";
 import { provisionAccount, signOut } from "@/app/actions";
 import { workflowAction } from "@/app/workflow-actions";
+import { productUnit, quantityUnit, variantUnit } from "@/lib/checkout";
 import { Pagination } from "./pagination";
 import { PhoneField } from "./phone-field";
 import { LocationPicker } from "./location-picker";
@@ -84,14 +86,16 @@ import { SmeOrdersTable } from "./sme-orders-table";
 import { StockPlanning } from "./stock-planning";
 import { TakeoverReport } from "./takeover-report";
 import { BranchStockMovements } from "./branch-stock-movements";
+import { SmeLocationSettings } from "./sme-location-settings";
 import { workspaceHref, portalLogin } from "@/lib/portals";
+import { statusToneClass } from "@/lib/status-tone";
 
 type Nav = { key: string; label: string; icon: LucideIcon; badge?: string };
 const navigations: Record<Role, Nav[]> = {
   hq: [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
     { key: "orders", label: "Wholesale orders", icon: ClipboardList },
-    { key: "inventory", label: "Shoes & stock", icon: Package },
+    { key: "inventory", label: "Products & stock", icon: Package },
     { key: "branches", label: "Branches", icon: Store },
     { key: "drivers", label: "Driver", icon: Truck },
     { key: "accounts", label: "Accounts & access", icon: Users },
@@ -100,7 +104,7 @@ const navigations: Record<Role, Nav[]> = {
   ],
   sme: [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
-    { key: "catalog", label: "STT catalog", icon: ShoppingBag },
+    { key: "catalog", label: "Ocean Pride catalog", icon: ShoppingBag },
     { key: "orders", label: "My orders", icon: ClipboardList },
     { key: "locations", label: "Supplier locations", icon: MapPin },
   ],
@@ -120,7 +124,7 @@ const navigations: Record<Role, Nav[]> = {
 };
 const sectionTitles: Record<string, string> = {
   orders: "Wholesale orders",
-  inventory: "Shoes & stock",
+  inventory: "Products & stock",
   branches: "Your branch network",
   drivers: "Driver",
   accounts: "Accounts & access",
@@ -128,7 +132,7 @@ const sectionTitles: Record<string, string> = {
   "stock-planning": "Stock Planning",
   "stock-movements": "Manage Stock Movement",
   settings: "Workspace settings",
-  catalog: "STT shoe catalog",
+  catalog: "Ocean Pride product catalog",
   locations: "Supplier locations",
   sales: "Retail sales",
   deliveries: "Your deliveries",
@@ -154,7 +158,7 @@ function Icon({
 function Badge({ status }: { status: string }) {
   return (
     <span
-      className={`badge badge-${status.toLowerCase().replaceAll(" ", "-")}`}
+      className={`badge badge-${status.toLowerCase().replaceAll(" ", "-")} ${statusToneClass(status)}`}
     >
       <span className="status-dot" />
       {status}
@@ -232,6 +236,7 @@ export function Workspace({
   const [accountRole, setAccountRole] = useState<"sme" | "driver" | "branch">(
     "sme",
   );
+  const [accountAddress, setAccountAddress] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [narrow, setNarrow] = useState(false);
   const navRef = useRef<HTMLElement>(null);
@@ -263,7 +268,7 @@ export function Workspace({
   const effectiveQuery = { ...query, orderId: selected?.id };
   const snapshot = useQuery({
     ...workspaceOptions(scope, effectiveQuery),
-    refetchInterval: role === "hq" ? 30_000 : false,
+    refetchInterval: 30_000,
     initialData: sameWorkspaceQuery(effectiveQuery, initialData.query ?? {})
       ? initialData
       : undefined,
@@ -415,11 +420,98 @@ export function Workspace({
   const refillRequests = role === "hq" ? (data.refillRequests ?? []) : [];
   const refillRequestCount =
     role === "hq" ? (data.refillRequestCount ?? refillRequests.length) : 0;
+  const phaseNotifications = data.orders.flatMap((order) => {
+    const workflow = order.workflow;
+    const current = workflow?.fulfilment?.current;
+    const phases =
+      workflow?.handoffs?.filter(
+        (handoff) => handoff.resolution === "phased_delivery",
+      ) ?? [];
+    const latestPhase = phases[0];
+    if (role === "branch") {
+      const pending = phases.find(
+        (handoff) =>
+          handoff.branchId === viewer.branchId && handoff.status === "pending",
+      );
+      if (pending) {
+        return [
+          {
+            order,
+            title: "Branch delivery phase requested",
+            detail: `${order.reference} · review and accept the requested stock`,
+          },
+        ];
+      }
+      if (
+        current &&
+        current.sourceBranchId === viewer.branchId &&
+        current.state === "reserved" &&
+        !workflow?.driverId
+      ) {
+        return [
+          {
+            order,
+            title: "Assign a driver to the branch phase",
+            detail: `${order.reference} · ${current.pairs} units reserved`,
+          },
+        ];
+      }
+      return [];
+    }
+    if (role === "hq") {
+      if (latestPhase?.status === "declined") {
+        return [
+          {
+            order,
+            title: "Branch declined a delivery phase",
+            detail: `${latestPhase.branchName} · ${order.reference}`,
+          },
+        ];
+      }
+      if (
+        latestPhase?.status === "accepted" &&
+        current &&
+        current.sourceBranchId === latestPhase.branchId &&
+        current.state === "reserved"
+      ) {
+        return [
+          {
+            order,
+            title: "Branch accepted a delivery phase",
+            detail: `${latestPhase.branchName} · ${order.reference} · ${current.pairs} units`,
+          },
+        ];
+      }
+      return [];
+    }
+    if (role === "sme" && current) {
+      return [
+        {
+          order,
+          title: "Delivery phase updated",
+          detail: `${order.reference} · Phase ${current.number} ${current.state}`,
+        },
+      ];
+    }
+    if (role === "driver" && workflow?.driverId === viewer.id && current) {
+      return [
+        {
+          order,
+          title: "Phased delivery assigned",
+          detail: `${order.reference} · Phase ${current.number} · ${current.pairs} units`,
+        },
+      ];
+    }
+    return [];
+  });
   const notificationCount =
-    summary.awaiting + summary.held + refillRequestCount;
+    summary.awaiting +
+    summary.held +
+    refillRequestCount +
+    phaseNotifications.length;
   const matchedOrders = data.orders;
   const matchedProducts = data.products.filter((p) =>
-    `${p.name} ${p.brand} ${p.size} ${p.color}`
+    `${p.name} ${p.category} ${p.pack}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
@@ -591,6 +683,7 @@ export function Workspace({
       role: String(form.get("role")) as "sme" | "driver" | "branch",
       phone: String(form.get("phone") ?? ""),
       phoneCountry: String(form.get("phoneCountry") ?? "MM"),
+      address: String(form.get("address") ?? "").trim(),
       pin: pin.data,
       branchId: String(form.get("branchId") ?? ""),
     };
@@ -672,7 +765,7 @@ export function Workspace({
                       <strong>{o.business}</strong>
                       <small>
                         {o.reference} <span className="dot-separator">·</span>{" "}
-                        {o.items} pairs
+                        {o.items} units
                       </small>
                     </span>
                   </button>
@@ -804,11 +897,12 @@ export function Workspace({
         >
           <X size={20} />
         </button>
-        <Link href={href("overview")} className="brand">
-          <span className="brand-mark">
-            <Icon icon={Boxes} size={23} />
-          </span>
-          Supply<span className="brand-light">Link</span>
+        <Link
+          href={href("overview")}
+          className="brand"
+          aria-label="SupplyLink home"
+        >
+          <BrandLogo className="brand-logo" />
         </Link>
         <Link
           className="workspace-switch"
@@ -821,7 +915,7 @@ export function Workspace({
           <div>
             <strong>
               {role === "hq"
-                ? "STT Supplier"
+                ? "Ocean Pride Longyi"
                 : role === "sme"
                   ? viewer.name
                   : role === "branch"
@@ -985,7 +1079,7 @@ export function Workspace({
                     {role === "hq"
                       ? "A little clarity for everything moving in your business."
                       : role === "sme"
-                        ? "Your STT shoe orders and deliveries in one place."
+                        ? "Your Ocean Pride Longyi orders and deliveries in one place."
                         : role === "branch"
                           ? "Keep retail moving and your wholesale reserve ready."
                           : "Your assigned deliveries and the details you need."}
@@ -1021,7 +1115,7 @@ export function Workspace({
                           "stock-movements":
                             "Confirm incoming physical stock and review completed receipts.",
                           catalog:
-                            "One STT shoe model. Choose the right sizes and colors for your shop.",
+                            "Browse the latest wholesale products and styles.",
                           sales:
                             "Every sale accounted for. Every pack in its place.",
                           settings: "Your account and workspace preferences.",
@@ -1215,7 +1309,7 @@ export function Workspace({
                   <h2>
                     {role === "sme" ? (
                       <>
-                        STT shoes.
+                        Premium longyi.
                         <br />
                         Ready for your shelves.
                       </>
@@ -1239,7 +1333,7 @@ export function Workspace({
                         ? "Bring your sales, stock and backup fulfilment together."
                         : role === "driver"
                           ? "Keep the shops that depend on you in the loop."
-                          : "STT shoe catalog from the supplier you trust, all in one place."}
+                          : "Ocean Pride Longyi wholesale products from the supplier you trust, all in one place."}
                   </p>
                   <Link
                     href={href(
@@ -1338,12 +1432,12 @@ export function Workspace({
                           detail: "Completed",
                         },
                         {
-                          label: "Shoe models",
+                          label: "Product styles",
                           value: String(
                             new Set(data.products.map((p) => p.name)).size,
                           ),
                           unit: "model",
-                          note: "STT · stocked by size and color",
+                          note: "Ocean Pride wholesale catalog",
                           icon: Package,
                           detail: "In the catalog",
                         },
@@ -1374,7 +1468,7 @@ export function Workspace({
                                 0,
                               ),
                             ),
-                            unit: "pairs",
+                            unit: "pieces",
                             note: "Excludes protected reserves",
                             icon: Package,
                             detail: "Retail stock",
@@ -1517,7 +1611,7 @@ export function Workspace({
                               <span>
                                 <strong>{o.business}</strong>
                                 <small>
-                                  {o.location} · {o.items} pairs
+                                  {o.location} · {o.items} units
                                 </small>
                                 {o.workflow?.fulfilment?.current && (
                                   <small>
@@ -1594,7 +1688,7 @@ export function Workspace({
                         <p>
                           {role === "driver"
                             ? "Confirm pickup when you collect the parcel to begin delivery and live location sharing. Keep Supply Link open, then report handover at the destination."
-                            : "Retail availability excludes protected wholesale pairs. Backup deliveries need HQ approval and branch acceptance."}
+                            : "Retail availability excludes stock protected for wholesale backup deliveries. HQ approval and branch acceptance are required."}
                         </p>
                       </div>
                     </section>
@@ -1777,14 +1871,14 @@ export function Workspace({
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search shoe size or color…"
+                    placeholder="Search product or style…"
                   />
                 </label>
               </div>
               <div className="supplier-catalog-note">
                 <ShieldCheck size={17} />
-                <strong>STT exclusive supplier</strong>
-                <span>One shoe model · Sizes 38–40 · White & black</span>
+                <strong>Ocean Pride wholesale catalog</strong>
+                <span>Browse available products and styles</span>
               </div>
               {section === "catalog" && data.settings?.shipping == null && (
                 <div className="inline-note">
@@ -1805,11 +1899,11 @@ export function Workspace({
                     <table>
                       <thead>
                         <tr>
-                          <th>Product / pair</th>
+                          <th>Product / style</th>
                           <th>On hand</th>
                           <th>Reserved</th>
                           <th>Wholesale available</th>
-                          <th>Wholesale / pair</th>
+                          <th>Wholesale / unit</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1819,8 +1913,12 @@ export function Workspace({
                               <strong>{p.name}</strong>
                               <small>{p.pack}</small>
                             </td>
-                            <td>{p.stock} pairs</td>
-                            <td>{p.reserve} pairs</td>
+                            <td>
+                              {p.stock} {productUnit(p)}s
+                            </td>
+                            <td>
+                              {p.reserve} {productUnit(p)}s
+                            </td>
                             <td>
                               <Badge
                                 status={
@@ -1829,7 +1927,9 @@ export function Workspace({
                                     : "In stock"
                                 }
                               />
-                              <small>{p.stock - p.reserve} pairs</small>
+                              <small>
+                                {p.stock - p.reserve} {productUnit(p)}s
+                              </small>
                             </td>
                             <td className="amount">{money(p.price)} MMK</td>
                           </tr>
@@ -1853,7 +1953,7 @@ export function Workspace({
                 <Empty
                   icon={Package}
                   title="No products found"
-                  text="Try another shoe size or color."
+                  text="Try another product name or style."
                 />
               )}
             </>
@@ -1902,7 +2002,7 @@ export function Workspace({
                           <span>
                             <small>Stock on hand</small>
                             <strong>
-                              {b.stock} <em>pairs</em>
+                              {b.stock} <em>units</em>
                             </strong>
                           </span>
                         </div>
@@ -2193,56 +2293,99 @@ export function Workspace({
           )}
           {section === "deliveries" && (
             <div className="delivery-grid">
-              {data.orders.map((o) => (
-                <section className="panel delivery-card" key={o.id}>
-                  <div className="heading-inline">
-                    <span className="branch-icon">
-                      <Truck size={24} />
-                    </span>
-                    <Badge status={o.status} />
-                  </div>
-                  <h2>{o.business}</h2>
-                  {o.workflow?.fulfilment?.current && (
+              {data.orders.map((o) => {
+                const currentPhase = o.workflow?.fulfilment?.current;
+                const branchPhaseRequest =
+                  role === "branch"
+                    ? o.workflow?.handoffs?.find(
+                        (handoff) =>
+                          handoff.branchId === viewer.branchId &&
+                          handoff.status === "pending" &&
+                          handoff.resolution === "phased_delivery",
+                      )
+                    : undefined;
+                const branchPhaseNeedsDriver =
+                  role === "branch" &&
+                  !!currentPhase &&
+                  currentPhase.sourceBranchId === viewer.branchId &&
+                  currentPhase.state === "reserved" &&
+                  !o.workflow?.driverId;
+                return (
+                  <section className="panel delivery-card" key={o.id}>
+                    <div className="heading-inline">
+                      <span className="branch-icon">
+                        <Truck size={24} />
+                      </span>
+                      <Badge
+                        status={
+                          branchPhaseRequest
+                            ? "Branch phase · action required"
+                            : branchPhaseNeedsDriver
+                              ? "Assign branch driver"
+                              : o.status
+                        }
+                      />
+                    </div>
+                    <h2>{o.business}</h2>
+                    {branchPhaseRequest && (
+                      <div className="inline-note">
+                        Phase {currentPhase?.number ?? 1} ·{" "}
+                        {currentPhase?.pairs ?? 0} pairs · Accept to reserve,
+                        then assign a driver.
+                      </div>
+                    )}
+                    {branchPhaseNeedsDriver && (
+                      <div className="inline-note">
+                        Phase {currentPhase.number} · {currentPhase.pairs} pairs
+                        reserved · Assign a driver.
+                      </div>
+                    )}
+                    {o.workflow?.fulfilment?.current && (
+                      <p className="muted">
+                        Phase {o.workflow.fulfilment.current.number} ·{" "}
+                        {o.workflow.fulfilment.deliveryStatus}
+                      </p>
+                    )}
                     <p className="muted">
-                      Phase {o.workflow.fulfilment.current.number} ·{" "}
-                      {o.workflow.fulfilment.deliveryStatus}
+                      {o.reference} · {o.items} units
                     </p>
-                  )}
-                  <p className="muted">
-                    {o.reference} · {o.items} pairs
-                  </p>
-                  <div className="delivery-stops">
-                    <div>
-                      <span className="stop-dot" />
-                      <span>
-                        <small>Collect from</small>
-                        <strong>{o.source}</strong>
-                      </span>
+                    <div className="delivery-stops">
+                      <div>
+                        <span className="stop-dot" />
+                        <span>
+                          <small>Collect from</small>
+                          <strong>{o.source}</strong>
+                        </span>
+                      </div>
+                      <div>
+                        <MapPin size={18} />
+                        <span>
+                          <small>Deliver to</small>
+                          <strong>{o.location}</strong>
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <MapPin size={18} />
-                      <span>
-                        <small>Deliver to</small>
-                        <strong>{o.location}</strong>
-                      </span>
-                    </div>
-                  </div>
-                  {role === "driver" && (
-                    <p className="inline-note">
-                      {o.workflow?.pickedUpAt
-                        ? "Pickup confirmed. Open delivery details, then Open delivery view to follow the route or resume location sharing."
-                        : "Open delivery details and confirm pickup after collecting the parcel."}
-                    </p>
-                  )}
-                  <button
-                    className="button secondary full-width"
-                    onClick={() => setSelected(o)}
-                  >
-                    View delivery details
-                    <ArrowRight size={15} />
-                  </button>
-                </section>
-              ))}
+                    {role === "driver" && (
+                      <p className="inline-note">
+                        {o.workflow?.pickedUpAt
+                          ? "Pickup confirmed. Open delivery details, then Open delivery view to follow the route or resume location sharing."
+                          : "Open delivery details and confirm pickup after collecting the parcel."}
+                      </p>
+                    )}
+                    <button
+                      className="button secondary full-width"
+                      onClick={() => setSelected(o)}
+                    >
+                      {branchPhaseRequest
+                        ? "Review & accept branch request"
+                        : branchPhaseNeedsDriver
+                          ? "Assign branch driver"
+                          : "View delivery details"}
+                      <ArrowRight size={15} />
+                    </button>
+                  </section>
+                );
+              })}
               {pageControls("orders", "Deliveries")}
               {!data.orders.length && (
                 <Empty
@@ -2260,6 +2403,13 @@ export function Workspace({
           {section === "help" && <Guide />}
           {section === "settings" && (
             <div className="settings-grid">
+              {role === "sme" && (
+                <SmeLocationSettings
+                  profile={data.profile}
+                  query={query}
+                  updated={applySnapshot}
+                />
+              )}
               {role === "hq" && (
                 <WorkflowAdmin
                   data={data}
@@ -2346,7 +2496,7 @@ export function Workspace({
               <span className="footer-logo">
                 <Boxes size={14} />
               </span>
-              STT shoes. Stronger connections.
+              Ocean Pride Longyi. Stronger connections.
             </span>
             <span>
               {demo ? "Local demo · Saved workflow" : "SupplyLink workspace"}
@@ -2395,7 +2545,7 @@ export function Workspace({
                   required
                   minLength={2}
                   maxLength={100}
-                  placeholder="e.g. Mingalar Shoe Store"
+                  placeholder="e.g. Mingalar Longyi Shop"
                 />
               </label>
               <label className="field">
@@ -2413,6 +2563,21 @@ export function Workspace({
                 </select>
               </label>
               <PhoneField />
+              {accountRole === "sme" && (
+                <label className="field account-address-field">
+                  Business delivery address
+                  <textarea
+                    name="address"
+                    value={accountAddress}
+                    onChange={(event) => setAccountAddress(event.target.value)}
+                    required
+                    minLength={5}
+                    maxLength={300}
+                    autoComplete="street-address"
+                    placeholder="Street, building, township, city"
+                  />
+                </label>
+              )}
               {accountRole !== "sme" && (
                 <label className="field">
                   {accountRole === "branch"
@@ -2422,7 +2587,7 @@ export function Workspace({
                     <option value="">
                       {accountRole === "branch"
                         ? "Choose an open branch"
-                        : "STT Yangon HQ"}
+                        : "Ocean Pride Longyi HQ"}
                     </option>
                     {data.branches
                       .filter((b) => b.active !== false)
@@ -2441,7 +2606,14 @@ export function Workspace({
               )}
             </div>
             <div className="account-location">
-              <LocationPicker required label="Account location pin" />
+              <LocationPicker
+                required
+                label="Account location pin"
+                addressValue={accountAddress}
+                onAddressChange={(address) => {
+                  if (accountRole === "sme") setAccountAddress(address);
+                }}
+              />
             </div>
             <div className="inline-note">
               The system generates a secure temporary password. It appears once
@@ -2577,6 +2749,27 @@ export function Workspace({
       {modal === "notifications" && (
         <Modal title="Your notifications" close={() => setModal(null)}>
           <div className="modal-form">
+            {phaseNotifications.map(({ order, title, detail }) => (
+              <button
+                key={`phase-${order.id}`}
+                className="notification-row"
+                onClick={() => {
+                  setModal(null);
+                  setSelected(order);
+                }}
+              >
+                <span className="action-icon amber">
+                  <Truck size={20} />
+                </span>
+                <span>
+                  <strong>{title}</strong>
+                  <small>
+                    {order.business} · {detail}
+                  </small>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+            ))}
             {refillRequests.map((request) => (
               <Link
                 key={request.id}
@@ -2597,12 +2790,23 @@ export function Workspace({
                     {request.branchName} · {request.variant}
                   </small>
                   <small>
-                    {request.onHand} pairs{" "}
+                    {request.onHand}{" "}
+                    {quantityUnit(
+                      request.onHand,
+                      request.unit ?? variantUnit(request.variant),
+                    )}{" "}
                     {request.pool === "backup" ? "in backup" : "on hand"} ·
                     below {request.threshold}
                   </small>
                   {request.incoming > 0 && (
-                    <small>{request.incoming} pairs in pending refills</small>
+                    <small>
+                      {request.incoming}{" "}
+                      {quantityUnit(
+                        request.incoming,
+                        request.unit ?? variantUnit(request.variant),
+                      )}{" "}
+                      in pending refills
+                    </small>
                   )}
                 </span>
                 <ChevronRight size={18} />
@@ -2684,14 +2888,15 @@ export function Workspace({
               <select name="product">
                 {data.products.map((p) => (
                   <option value={p.id} key={p.id}>
-                    {p.pack} · {p.stock - p.reserve} retail pairs available
+                    {p.pack} · {p.stock - p.reserve} retail {productUnit(p)}s
+                    available
                   </option>
                 ))}
               </select>
             </label>
             <div className="form-grid">
               <label className="field">
-                Pairs sold
+                Units sold
                 <input
                   type="number"
                   name="quantity"
@@ -2702,7 +2907,7 @@ export function Workspace({
                 />
               </label>
               <label className="field">
-                Selling price / pair (MMK)
+                Selling price / unit (MMK)
                 <input
                   type="number"
                   name="price"
@@ -2759,7 +2964,7 @@ function SalesList({ sales }: { sales: WorkspaceData["retailSales"] }) {
           <span>
             <strong>{s.description}</strong>
             <small>
-              {s.id} · {s.packs} pairs · {s.date}
+              {s.id} · {s.packs} units · {s.date}
             </small>
           </span>
           <strong>

@@ -17,8 +17,10 @@ import {
   Upload,
 } from "lucide-react";
 import { workflowAction } from "@/app/workflow-actions";
+import { variantUnit } from "@/lib/checkout";
 import { planningRequest } from "@/lib/stock-planning-client";
 import { readTracking } from "@/lib/tracking-client";
+import { metresBetween } from "@/lib/routing";
 import {
   money,
   total,
@@ -30,6 +32,34 @@ import {
 } from "@/lib/domain";
 
 import type { WorkspaceQuery } from "@/lib/workflow/query";
+import { statusToneClass } from "@/lib/status-tone";
+
+function recommendedBackupBranch(order: Order, branches: Branch[]) {
+  const destination = order.pin;
+  const lines = order.workflow?.lines;
+  if (!destination || !lines?.length) return "";
+
+  return (
+    branches
+      .filter(
+        (branch) =>
+          branch.active !== false &&
+          branch.id !== order.workflow?.sourceBranchId &&
+          !!branch.pin &&
+          lines.every((line) => {
+            const stock = branch.inventory?.find(
+              (item) => item.productId === line.productId,
+            );
+            return !!stock && stock.onHand - stock.allocated >= line.quantity;
+          }),
+      )
+      .sort(
+        (a, b) =>
+          metresBetween(destination, a.pin!) -
+          metresBetween(destination, b.pin!),
+      )[0]?.id ?? ""
+  );
+}
 
 export function OrderWorkflow({
   order,
@@ -70,6 +100,7 @@ export function OrderWorkflow({
   const [fullReceipt, setFullReceipt] = useState(false);
   const uploadRetry = useRef<{ fingerprint: string; key: string } | null>(null);
   const [backupBranch, setBackupBranch] = useState("");
+  const backupBranchOverridden = useRef(false);
   const [declineCause, setDeclineCause] = useState("");
   const [planningNotice, setPlanningNotice] = useState("");
   const [originalResolution, setOriginalResolution] =
@@ -214,11 +245,13 @@ export function OrderWorkflow({
     <div className="modal-form workflow-detail" aria-busy={pending}>
       <div className="workflow-heading">
         <div>
-          <span className="eyebrow">STT WHOLESALE</span>
+          <span className="eyebrow">OCEAN PRIDE LONGYI WHOLESALE</span>
           <h3>{sme ? "Order status" : order.business}</h3>
           {!sme && <p className="muted">{order.location}</p>}
         </div>
-        <span className="workflow-status">{order.status}</span>
+        <span className={`workflow-status ${statusToneClass(order.status)}`}>
+          {order.status}
+        </span>
       </div>
       <button
         type="button"
@@ -239,6 +272,11 @@ export function OrderWorkflow({
         <RefreshCw size={14} />
         Refresh status
       </button>
+      {error && (
+        <p className="form-error" role="alert" tabIndex={-1}>
+          {error}
+        </p>
+      )}
       <PhasedFulfilment
         order={order}
         viewer={viewer}
@@ -252,7 +290,8 @@ export function OrderWorkflow({
             <span>
               <strong>{l.name}</strong>
               <small>
-                {l.variant} · {l.quantity} pairs
+                {l.variant} · {l.quantity} {variantUnit(l.variant)}
+                {l.quantity === 1 ? "" : "s"}
               </small>
             </span>
             {privateFinance && (
@@ -560,6 +599,13 @@ export function OrderWorkflow({
           )}
           {hq && (
             <div className="workflow-form">
+              {w.replacementRequired && (
+                <p className="inline-note">
+                  This request reserves the whole order. Cancel it to use the
+                  stock-based delivery planner for a full or partial branch
+                  delivery.
+                </p>
+              )}
               <label className="field">
                 Reason to cancel request
                 <textarea
@@ -589,18 +635,28 @@ export function OrderWorkflow({
         (w.sourceBranchId || w.dispatched) &&
         !terminal &&
         !w.handoffPending &&
+        !(w.dispatched && !w.sourceBranchId && deliveryStatus === "On hold") &&
         w.paymentVerified &&
         w.reserved &&
         !w.received &&
         ["Confirmed", "Preparing", "On hold"].includes(deliveryStatus) && (
-          <details className="workflow-section">
+          <details
+            className="workflow-section"
+            onToggle={(event) => {
+              if (event.currentTarget.open && !backupBranchOverridden.current)
+                setBackupBranch(recommendedBackupBranch(order, branches));
+            }}
+          >
             <summary>Arrange fulfilment from a branch</summary>
             <div className="workflow-form">
               <label className="field">
                 Receiving branch
                 <select
                   value={backupBranch}
-                  onChange={(e) => setBackupBranch(e.target.value)}
+                  onChange={(e) => {
+                    backupBranchOverridden.current = true;
+                    setBackupBranch(e.target.value);
+                  }}
                 >
                   <option value="">Choose an open branch</option>
                   {branches
@@ -902,11 +958,6 @@ export function OrderWorkflow({
             </div>
           </section>
         )}
-      {error && (
-        <p className="form-error" role="alert" tabIndex={-1}>
-          {error}
-        </p>
-      )}
     </div>
   );
 }

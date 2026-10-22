@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { money, total, type Order } from "@/lib/domain";
+import { statusToneClass } from "@/lib/status-tone";
 
 function PaymentStatus({ order }: { order: Order }) {
   const workflow = order.workflow;
@@ -22,7 +23,7 @@ function PaymentStatus({ order }: { order: Order }) {
         : "Not submitted";
   return (
     <span
-      className={`sme-payment-status${workflow?.paymentVerified ? " verified" : ""}`}
+      className={`sme-payment-status ${statusToneClass(label)}${workflow?.paymentVerified ? " verified" : ""}`}
     >
       {label}
     </span>
@@ -102,7 +103,7 @@ export function SmeOrdersTable({
                 </td>
                 <td>
                   <span
-                    className={`badge badge-${order.status.toLowerCase().replaceAll(" ", "-")}`}
+                    className={`badge badge-${order.status.toLowerCase().replaceAll(" ", "-")} ${statusToneClass(order.status)}`}
                   >
                     <span className="status-dot" />
                     {order.status}

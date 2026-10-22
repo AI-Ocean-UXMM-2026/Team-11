@@ -23,6 +23,7 @@ describe("international contact details", () => {
       role: "sme",
       phone: "2025550123",
       phoneCountry: "US",
+      address: "12 Hlaing Road, Yangon",
       pin: { latitude: 0, longitude: 0 },
     };
     expect(accountSchema.parse(input).phone).toBe("+12025550123");

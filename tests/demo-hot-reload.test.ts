@@ -57,6 +57,7 @@ it("uses the current account handler after hot reload without dropping existing 
     role: "sme",
     phone: "9211111111",
     phoneCountry: "MM",
+    address: "12 Hlaing Road, Yangon",
     branchId: "",
     pin: { latitude: 16.84, longitude: 96.17 },
   });

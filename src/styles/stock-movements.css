@@ -66,7 +66,7 @@
   margin-top: 20px;
   border: 1px solid var(--border);
   border-radius: 9px;
-  background: #fbfcfa;
+  background: #FCFCFC;
 }
 .branch-movement-preview > div {
   display: grid;
@@ -103,7 +103,7 @@
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #f7f9f5;
+  background: #F8F8F8;
   color: var(--forest);
   font-size: 13px;
 }
@@ -125,7 +125,7 @@
   white-space: nowrap;
 }
 .movement-out {
-  color: #a54d38;
+  color: #5E5E5E;
   white-space: nowrap;
 }
 .branch-movement-pagination,
@@ -163,7 +163,7 @@
   margin: 0;
   color: var(--forest);
   background: var(--mint);
-  border: 1px solid #c8dbc3;
+  border: 1px solid #D5D5D5;
   border-radius: 5px;
   font-size: 12px;
 }

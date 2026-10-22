@@ -1,4 +1,8 @@
-import { workflowActor, WorkflowError } from "@/lib/workflow/server";
+import {
+  presentPortalData,
+  workflowActor,
+  WorkflowError,
+} from "@/lib/workflow/server";
 import {
   assignDeliveryGroup,
   dispatchCandidates,
@@ -19,7 +23,11 @@ function failure(error: unknown) {
 export async function GET() {
   try {
     return Response.json(
-      { data: await dispatchCandidates(await workflowActor()) },
+      {
+        data: presentPortalData(
+          await dispatchCandidates(await workflowActor()),
+        ),
+      },
       { headers },
     );
   } catch (error) {
@@ -41,7 +49,7 @@ export async function POST(request: Request) {
       throw new WorkflowError("Invalid delivery plan.");
     }
     return Response.json(
-      { data: await assignDeliveryGroup(actor, input) },
+      { data: presentPortalData(await assignDeliveryGroup(actor, input)) },
       { headers },
     );
   } catch (error) {

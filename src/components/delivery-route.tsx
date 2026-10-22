@@ -14,6 +14,7 @@ import {
   type RouteResponse,
 } from "@/lib/routing";
 import { LocationMap } from "./location-map";
+import { MAP_MARKER_COLORS } from "@/lib/maps";
 
 export function DeliveryRoute({
   data,
@@ -110,7 +111,7 @@ export function DeliveryRoute({
             id: "source",
             pin: data.source.pin,
             label: `Collect from ${data.source.name}`,
-            color: "#66756e",
+            color: MAP_MARKER_COLORS.dispatch,
           },
         ]
       : []),
@@ -120,7 +121,7 @@ export function DeliveryRoute({
             id: "destination",
             pin: data.destination,
             label: "Delivery destination",
-            color: "#17674f",
+            color: MAP_MARKER_COLORS.destination,
           },
         ]
       : []),
@@ -132,7 +133,9 @@ export function DeliveryRoute({
         label: stop.own
           ? `Stop ${stop.position}: your delivery destination`
           : `Stop ${stop.position}: ${viewer.role === "sme" ? "earlier delivery stop" : "delivery destination"}`,
-        color: stop.own ? "#17674f" : "#a66a15",
+        color: stop.own
+          ? MAP_MARKER_COLORS.destination
+          : MAP_MARKER_COLORS.otherStop,
         number: stop.position,
       })) ?? []),
   ];
@@ -291,7 +294,11 @@ export function DeliveryRoute({
                 : "Dispatch source"
           }
           pinColor={
-            data.point ? "#2868b2" : data.destination ? "#17674f" : "#66756e"
+            data.point
+              ? MAP_MARKER_COLORS.driver
+              : data.destination
+                ? MAP_MARKER_COLORS.destination
+                : MAP_MARKER_COLORS.dispatch
           }
           markers={markers}
           label="Delivery tracking"

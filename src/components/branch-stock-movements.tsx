@@ -2,13 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowDownToLine,
-  ClipboardList,
-  RefreshCw,
-} from "lucide-react";
+import { ArrowDownToLine, ClipboardList, RefreshCw } from "lucide-react";
 import type { Viewer, WorkspaceData } from "@/lib/domain";
 import type { BranchStockMovementPage } from "@/lib/workflow/stock-movements";
+import { variantUnit } from "@/lib/checkout";
 import { StockTransfers } from "./branch-network";
 
 async function readHistory(branch: string, page: number, signal?: AbortSignal) {
@@ -179,7 +176,7 @@ export function BranchStockMovements({
                       <tr>
                         <th>Date</th>
                         <th>Branch</th>
-                        <th>Shoe variant</th>
+                        <th>Product / style</th>
                         <th>Movement</th>
                         <th>Quantity</th>
                         <th>Reason</th>
@@ -202,7 +199,9 @@ export function BranchStockMovements({
                               }
                             >
                               {row.quantity > 0 ? "+" : ""}
-                              {quantity(row.quantity)} pairs
+                              {quantity(row.quantity)}{" "}
+                              {variantUnit(row.variant)}
+                              {row.quantity === 1 ? "" : "s"}
                             </strong>
                           </td>
                           <td>{row.reason}</td>

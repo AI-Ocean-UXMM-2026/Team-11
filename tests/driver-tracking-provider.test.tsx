@@ -38,7 +38,7 @@ function Controls() {
             attemptId: "attempt",
             viewerId: "driver",
             demo: false,
-            reference: "STT-trip",
+            reference: "OPL-trip",
           })
         }
       >
@@ -70,7 +70,7 @@ beforeEach(() => {
   transport.path = "/driver/deliveries";
   snapshot = {
     orderId: "order",
-    reference: "STT-trip",
+    reference: "OPL-trip",
     status: "Shipping",
     attemptId: "attempt",
     driverId: "driver",
@@ -193,7 +193,7 @@ it("continues GPS for the next picked-up group stop after the current handover",
   const next = {
     orderId: "next-order",
     attemptId: "next-attempt",
-    reference: "STT-next",
+    reference: "OPL-next",
   };
   const active = { ...snapshot, ...next };
   snapshot = {

@@ -1,4 +1,8 @@
-import { workflowActor, WorkflowError } from "@/lib/workflow/server";
+import {
+  presentPortalData,
+  workflowActor,
+  WorkflowError,
+} from "@/lib/workflow/server";
 import { deliveryTracking, publishLocation } from "@/lib/workflow/tracking";
 import { samePortalOrigin } from "@/lib/workflow/origin";
 
@@ -17,9 +21,11 @@ export async function GET(_request: Request, context: Context) {
   try {
     return Response.json(
       {
-        data: await deliveryTracking(
-          await workflowActor(),
-          (await context.params).id,
+        data: presentPortalData(
+          await deliveryTracking(
+            await workflowActor(),
+            (await context.params).id,
+          ),
         ),
       },
       { headers },
@@ -40,10 +46,12 @@ export async function POST(request: Request, context: Context) {
     const actor = await workflowActor();
     return Response.json(
       {
-        data: await publishLocation(
-          actor,
-          (await context.params).id,
-          JSON.parse(body),
+        data: presentPortalData(
+          await publishLocation(
+            actor,
+            (await context.params).id,
+            JSON.parse(body),
+          ),
         ),
       },
       { headers },
