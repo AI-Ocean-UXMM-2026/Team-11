@@ -159,6 +159,29 @@ export function BranchNetwork({
               </span>
             </div>
             <h2>{b.name}</h2>
+            <div className="branch-pool-summary">
+              <div>
+                <small>Retail shop</small>
+                <strong>
+                  {b.retailStock ??
+                    b.inventory?.reduce(
+                      (sum, i) => sum + i.onHand - i.allocated - i.protected,
+                      0,
+                    ) ??
+                    0}{" "}
+                  <small>pairs available</small>
+                </strong>
+              </div>
+              <div>
+                <small>Wholesale backup</small>
+                <strong>
+                  {b.backupStock ??
+                    b.inventory?.reduce((sum, i) => sum + i.protected, 0) ??
+                    0}{" "}
+                  <small>pairs available</small>
+                </strong>
+              </div>
+            </div>
             {b.pin ? (
               <LocationLink pin={b.pin} label="View location pin" />
             ) : (
@@ -184,6 +207,14 @@ export function BranchNetwork({
               Manage branch
               <ArrowRight size={15} />
             </Link>
+            {b.active !== false && (
+              <Link
+                className="text-link"
+                href={`/stock-planning?branchId=${b.id}`}
+              >
+                Review backup suggestion <ArrowRight size={15} />
+              </Link>
+            )}
           </section>
         ))}
       </div>
@@ -257,6 +288,11 @@ export function StockTransfers({
                 <span className="workflow-status">{t.status}</span>
               </summary>
               <p className="muted">{t.reason}</p>
+              <p className="inline-note">
+                {t.purpose === "backup"
+                  ? "Wholesale backup stock — kept separate from retail on receipt."
+                  : "Retail shop stock"}
+              </p>
               <small>
                 Created{" "}
                 {new Intl.DateTimeFormat("en-GB", {

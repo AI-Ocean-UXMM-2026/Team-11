@@ -24,6 +24,7 @@ import { LocationLink } from "./location-link";
 import { LocationPicker } from "./location-picker";
 import { Pagination } from "./pagination";
 import { StockTransfers, useBranchAction } from "./branch-network";
+import { BranchBackupSetup } from "./branch-backup-setup";
 
 function BranchDialog({
   title,
@@ -87,6 +88,7 @@ export function BranchDetail({
     null,
   );
   const [direction, setDirection] = useState("refill");
+  const [purpose, setPurpose] = useState<"retail" | "backup">("retail");
   const [productId, setProductId] = useState(data.products[0]?.id ?? "");
   const [page, setPage] = useState(1),
     [pageSize, setPageSize] = useState<25 | 50 | 100>(25);
@@ -106,6 +108,7 @@ export function BranchDetail({
     },
     placeholderData: keepPreviousData,
     staleTime: 10000,
+    refetchInterval: 30_000,
     retry: 1,
   });
   async function changed(next: WorkspaceData, message?: string) {
@@ -133,12 +136,24 @@ export function BranchDetail({
   const source = inventory.find((i) => i.productId === productId);
   const available =
     direction === "return"
-      ? Math.max(0, (source?.onHand ?? 0) - (source?.allocated ?? 0))
+      ? purpose === "backup"
+        ? (source?.protected ?? 0)
+        : Math.max(
+            0,
+            (source?.onHand ?? 0) -
+              (source?.allocated ?? 0) -
+              (source?.protected ?? 0),
+          )
       : Math.max(0, (product?.stock ?? 0) - (product?.reserve ?? 0));
   const open = branch.active !== false;
+  const refillRequests =
+    history.data?.refillRequests ??
+    data.refillRequests?.filter((r) => r.branchId === branchId) ??
+    [];
   function show(next: typeof modal) {
     setError("");
     setDirection("refill");
+    setPurpose("retail");
     setModal(next);
   }
   const failure = error ? (
@@ -223,8 +238,9 @@ export function BranchDetail({
           <div>
             <h2 id="branch-stock-heading">Stock units</h2>
             <p className="muted">
-              Stock by shoe color and size. Available pairs exclude allocated
-              and protected stock.
+              Retail sales and emergency wholesale deliveries use separate stock
+              pools. Allocated pairs are already committed to an order or
+              transfer.
             </p>
           </div>
           <strong className="branch-total-stock">
@@ -238,7 +254,9 @@ export function BranchDetail({
                 <th>Product / variant</th>
                 <th>On hand</th>
                 <th>Allocated</th>
-                <th>Protected</th>
+                <th>Wholesale backup available</th>
+                <th>Backup committed</th>
+                <th>Backup target</th>
                 <th>Retail available</th>
               </tr>
             </thead>
@@ -268,6 +286,8 @@ export function BranchDetail({
                     <td>{i.onHand}</td>
                     <td>{i.allocated}</td>
                     <td>{i.protected}</td>
+                    <td>{i.backupAllocated ?? 0}</td>
+                    <td>{i.backupTarget ?? "Not configured"}</td>
                     <td>
                       <strong>
                         {Math.max(0, i.onHand - i.allocated - i.protected)}
@@ -285,6 +305,43 @@ export function BranchDetail({
           )}
         </div>
       </section>
+      <BranchBackupSetup
+        branch={branch}
+        updated={changed}
+        refillBackup={(productId) => {
+          show("refill");
+          setProductId(productId);
+          setPurpose("backup");
+        }}
+      />
+      {refillRequests.length > 0 && (
+        <section
+          className="panel info-pad"
+          aria-labelledby="branch-refill-requests-heading"
+        >
+          <h2 id="branch-refill-requests-heading">Automatic refill requests</h2>
+          <p className="muted">
+            HQ is notified when total on-hand stock is below 10 or dedicated
+            backup is below its configured target. Review pending refills before
+            reserving more stock.
+          </p>
+          <ul>
+            {refillRequests.map((request) => (
+              <li key={request.id}>
+                <strong>{request.variant}</strong>: {request.onHand} pairs{" "}
+                {request.pool === "backup" ? "in backup" : "on hand"} ·
+                threshold {request.threshold}
+                {request.incoming > 0 && (
+                  <> · {request.incoming} pairs in pending refills</>
+                )}
+              </li>
+            ))}
+          </ul>
+          <button className="button primary" onClick={() => show("refill")}>
+            <PackagePlus size={18} /> Refill stock
+          </button>
+        </section>
+      )}
       <section
         className="panel branch-drivers"
         aria-labelledby="branch-drivers-heading"
@@ -456,6 +513,7 @@ export function BranchDetail({
                     productId,
                     quantity,
                     reason: values.get("reason"),
+                    purpose,
                     sourceBranchId: direction === "return" ? branch.id : "",
                     destinationBranchId:
                       direction === "return" ? "" : branch.id,
@@ -480,6 +538,19 @@ export function BranchDetail({
                 >
                   <option value="refill">Refill branch from HQ</option>
                   <option value="return">Return branch stock to HQ</option>
+                </select>
+              </label>
+              <label className="field">
+                Stock pool
+                <select
+                  value={purpose}
+                  onChange={(e) => {
+                    setPurpose(e.target.value as "retail" | "backup");
+                    setError("");
+                  }}
+                >
+                  <option value="retail">Retail shop stock</option>
+                  <option value="backup">Wholesale backup stock</option>
                 </select>
               </label>
               <label className="field">
@@ -530,6 +601,8 @@ export function BranchDetail({
                 This reserves stock at the source. Confirm dispatch in the
                 transfer history; the destination confirms physical receipt
                 before its stock increases.
+                {purpose === "backup" &&
+                  " Branch receipt adds these pairs directly to the dedicated wholesale backup pool."}
               </p>
               {failure}
               <div className="modal-actions">

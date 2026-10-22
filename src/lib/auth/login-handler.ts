@@ -45,7 +45,25 @@ export function portalLoginHandler(portal: LoginPortal) {
           : { redirectTo: result.redirectTo },
         { status: result.status, headers },
       );
-    } catch {
+    } catch (error) {
+      const code =
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        typeof error.code === "string" &&
+        /^[a-z0-9_]{1,40}$/i.test(error.code)
+          ? error.code
+          : "UNEXPECTED";
+      // Credentials and raw provider/database errors must never enter logs.
+      const relation =
+        error instanceof Error && code === "42P01"
+          ? /^relation "([a-z_][a-z0-9_.]{0,120})" does not exist$/i.exec(
+              error.message,
+            )?.[1]
+          : undefined;
+      console.error(
+        `Portal sign-in failed (${portal}; ${code}${relation ? `; missing relation ${relation}` : ""})`,
+      );
       return Response.json(
         { error: "Sign-in is temporarily unavailable. Please try again." },
         { status: 503, headers },

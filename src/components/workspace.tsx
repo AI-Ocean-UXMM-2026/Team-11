@@ -77,6 +77,7 @@ import { WorkflowAdmin } from "./workflow-admin";
 import { NetworkArt } from "./network-art";
 import { SmeCheckout } from "./sme-checkout";
 import { SmeOrdersTable } from "./sme-orders-table";
+import { StockPlanning } from "./stock-planning";
 import { workspaceHref, portalLogin } from "@/lib/portals";
 
 type Nav = { key: string; label: string; icon: LucideIcon; badge?: string };
@@ -89,6 +90,7 @@ const navigations: Record<Role, Nav[]> = {
     { key: "drivers", label: "Driver", icon: Truck },
     { key: "accounts", label: "Accounts & access", icon: Users },
     { key: "reports", label: "Reports", icon: Wallet },
+    { key: "stock-planning", label: "Stock Planning", icon: Package },
   ],
   sme: [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
@@ -116,6 +118,7 @@ const sectionTitles: Record<string, string> = {
   drivers: "Driver",
   accounts: "Accounts & access",
   reports: "Sales & operations",
+  "stock-planning": "Stock Planning",
   settings: "Workspace settings",
   catalog: "STT shoe catalog",
   locations: "Supplier locations",
@@ -197,6 +200,7 @@ export function Workspace({
   section,
   branchId,
   restoreOrderId,
+  planningBranchId,
 }: {
   data: WorkspaceData;
   viewer: Viewer;
@@ -204,6 +208,7 @@ export function Workspace({
   section: string;
   branchId?: string;
   restoreOrderId?: string;
+  planningBranchId?: string;
 }) {
   const [query, setQuery] = useState<WorkspaceQuery>(initialData.query ?? {});
   const [exporting, setExporting] = useState(false);
@@ -250,6 +255,7 @@ export function Workspace({
   const effectiveQuery = { ...query, orderId: selected?.id };
   const snapshot = useQuery({
     ...workspaceOptions(scope, effectiveQuery),
+    refetchInterval: role === "hq" ? 30_000 : false,
     initialData: sameWorkspaceQuery(effectiveQuery, initialData.query ?? {})
       ? initialData
       : undefined,
@@ -398,6 +404,11 @@ export function Workspace({
     pendingTransfers: 0,
   };
   const retail = summary.retail;
+  const refillRequests = role === "hq" ? (data.refillRequests ?? []) : [];
+  const refillRequestCount =
+    role === "hq" ? (data.refillRequestCount ?? refillRequests.length) : 0;
+  const notificationCount =
+    summary.awaiting + summary.held + refillRequestCount;
   const matchedOrders = data.orders;
   const matchedProducts = data.products.filter((p) =>
     `${p.name} ${p.brand} ${p.size} ${p.color}`
@@ -901,10 +912,10 @@ export function Workspace({
             <button
               className="icon-button notification-button"
               onClick={() => open("notifications")}
-              aria-label={`Notifications, ${summary.awaiting + summary.held} action items`}
+              aria-label={`Notifications, ${notificationCount} action items`}
             >
               <Icon icon={Bell} size={20} />
-              {summary.awaiting + summary.held > 0 && <i />}
+              {notificationCount > 0 && <i />}
             </button>
             <span className="topbar-divider" />
             <button
@@ -985,6 +996,8 @@ export function Workspace({
                             "Bring your business customers and delivery team on board.",
                           reports:
                             "Recorded sales, clear numbers. Shipping stays separate.",
+                          "stock-planning":
+                            "Branch backup reserves for HQ wholesale deliveries. Set targets, review alerts, and arrange refills.",
                           catalog:
                             "One STT shoe model. Choose the right sizes and colors for your shop.",
                           sales:
@@ -1667,12 +1680,22 @@ export function Workspace({
           )}
 
           {section === "inventory" && role === "branch" && (
-            <StockTransfers
-              data={data}
-              viewer={viewer}
-              updated={applySnapshot}
-              pagination={pageControls("transfers", "Transfers")}
-            />
+            <>
+              {(data.refillRequestCount ?? 0) > 0 && (
+                <p className="inline-note" role="status">
+                  Refill requested automatically from HQ for{" "}
+                  {data.refillRequestCount} low-stock alerts. Requests close
+                  when the affected pool reaches its threshold. Check incoming
+                  refills below.
+                </p>
+              )}
+              <StockTransfers
+                data={data}
+                viewer={viewer}
+                updated={applySnapshot}
+                pagination={pageControls("transfers", "Transfers")}
+              />
+            </>
           )}
           {section === "branches" &&
             role === "hq" &&
@@ -1690,6 +1713,18 @@ export function Workspace({
             ))}
           {section === "drivers" && role === "hq" && (
             <DriverManagement data={data} updated={applySnapshot} />
+          )}
+          {section === "stock-planning" && role === "hq" && (
+            <StockPlanning
+              data={data}
+              openOrder={openOrder}
+              initialBranchId={planningBranchId}
+              viewer={viewer}
+              demo={demo}
+              updated={async () => {
+                await snapshot.refetch();
+              }}
+            />
           )}
           {(section === "catalog" || section === "inventory") && (
             <>
@@ -1730,8 +1765,17 @@ export function Workspace({
                         <tr>
                           <th>Product / pair</th>
                           <th>On hand</th>
-                          <th>Protected / allocated</th>
-                          <th>Retail available</th>
+                          <th>
+                            {role === "branch" ? "Allocated" : "Reserved"}
+                          </th>
+                          {role === "branch" && (
+                            <th>Wholesale backup available</th>
+                          )}
+                          <th>
+                            {role === "branch"
+                              ? "Retail available"
+                              : "Wholesale available"}
+                          </th>
                           <th>Wholesale / pair</th>
                         </tr>
                       </thead>
@@ -1743,7 +1787,25 @@ export function Workspace({
                               <small>{p.pack}</small>
                             </td>
                             <td>{p.stock} pairs</td>
-                            <td>{p.reserve} pairs</td>
+                            <td>
+                              {role === "branch"
+                                ? (data.branches
+                                    .find((b) => b.id === viewer.branchId)
+                                    ?.inventory?.find(
+                                      (i) => i.productId === p.id,
+                                    )?.allocated ?? 0)
+                                : p.reserve}{" "}
+                              pairs
+                            </td>
+                            {role === "branch" && (
+                              <td>
+                                {data.branches
+                                  .find((b) => b.id === viewer.branchId)
+                                  ?.inventory?.find((i) => i.productId === p.id)
+                                  ?.protected ?? 0}{" "}
+                                pairs
+                              </td>
+                            )}
                             <td>
                               <Badge
                                 status={
@@ -2495,6 +2557,44 @@ export function Workspace({
       {modal === "notifications" && (
         <Modal title="Your notifications" close={() => setModal(null)}>
           <div className="modal-form">
+            {refillRequests.map((request) => (
+              <Link
+                key={request.id}
+                className="notification-row"
+                href={`/branches/${request.branchId}`}
+                onClick={() => setModal(null)}
+              >
+                <span className="action-icon amber">
+                  <Package size={20} />
+                </span>
+                <span>
+                  <strong>
+                    {request.pool === "backup"
+                      ? "Wholesale backup refill requested"
+                      : "Automatic refill requested"}
+                  </strong>
+                  <small>
+                    {request.branchName} · {request.variant}
+                  </small>
+                  <small>
+                    {request.onHand} pairs{" "}
+                    {request.pool === "backup" ? "in backup" : "on hand"} ·
+                    below {request.threshold}
+                  </small>
+                  {request.incoming > 0 && (
+                    <small>{request.incoming} pairs in pending refills</small>
+                  )}
+                </span>
+                <ChevronRight size={18} />
+              </Link>
+            ))}
+            {refillRequestCount > refillRequests.length && (
+              <p>
+                Showing the latest {refillRequests.length} of{" "}
+                {refillRequestCount} refill requests. Open a branch to review
+                its requests.
+              </p>
+            )}
             {[...awaiting, ...held].map((o) => (
               <button
                 key={o.id}
@@ -2526,7 +2626,7 @@ export function Workspace({
                 review the rest.
               </p>
             )}
-            {summary.awaiting + summary.held === 0 && (
+            {notificationCount === 0 && (
               <Empty
                 icon={Bell}
                 title="You’re all caught up"

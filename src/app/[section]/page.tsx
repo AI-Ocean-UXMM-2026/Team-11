@@ -6,10 +6,10 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ section: string }>;
-  searchParams: Promise<{ role?: string }>;
+  searchParams: Promise<{ role?: string; branchId?: string }>;
 }) {
   const { section } = await params;
-  const { role } = await searchParams;
+  const { role, branchId } = await searchParams;
   if (
     ![
       "orders",
@@ -18,6 +18,7 @@ export default async function Page({
       "drivers",
       "accounts",
       "reports",
+      "stock-planning",
       "settings",
       "catalog",
       "locations",
@@ -27,5 +28,11 @@ export default async function Page({
     ].includes(section)
   )
     notFound();
-  return <WorkspacePage section={section} role={role} />;
+  return (
+    <WorkspacePage
+      section={section}
+      role={role}
+      planningBranchId={section === "stock-planning" ? branchId : undefined}
+    />
+  );
 }

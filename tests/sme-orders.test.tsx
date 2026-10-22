@@ -106,12 +106,12 @@ async function table() {
     root.render(<SmeOrdersTable orders={[order]} openOrder={openOrder} />),
   );
 }
-async function workflow(role: Role) {
+async function workflow(role: Role, branchId?: string) {
   await act(async () =>
     root.render(
       <OrderWorkflow
         order={order}
-        viewer={{ id: role, name: role, role }}
+        viewer={{ id: role, name: role, role, branchId }}
         accounts={[]}
         branches={[]}
         updated={vi.fn()}
@@ -239,7 +239,46 @@ it("retains payment evidence before verification and keeps HQ stock recovery aft
   expect(host.textContent).not.toContain("Payment evidence");
   expect(host.textContent).toContain("Retry stock reservation");
   expect(host.textContent).toContain("My private shop");
-  expect(host.textContent).toContain("Order activity");
+  expect(host.textContent).not.toContain("Order activity");
+});
+
+it("shows a single branch decline form for pending backup requests without fulfilment or activity", async () => {
+  order.status = "On hold";
+  order.workflow!.sourceBranchId = null;
+  order.workflow!.handoffs = [
+    {
+      id: "handoff",
+      branchId: "branch-a",
+      branchName: "Branch A",
+      status: "pending",
+      reason: "Wholesale backup",
+      resolution: "Returned to HQ",
+      at: "2026-10-22T05:00:00Z",
+    },
+  ];
+  await workflow("branch", "branch-a");
+  expect(host.querySelectorAll("textarea")).toHaveLength(1);
+  expect(host.textContent).toContain("Accept & reserve branch stock");
+  expect(host.textContent).toContain("Decline category");
+  for (const text of [
+    "Fulfilment",
+    "Branch delivery",
+    "Order activity",
+    "Issue, rejection or cancellation reason",
+  ])
+    expect(host.textContent).not.toContain(text);
+});
+
+it("retains branch delivery controls after acceptance under their own heading", async () => {
+  order.status = "Preparing";
+  order.workflow!.sourceBranchId = "branch-a";
+  order.workflow!.handoffs = [];
+  await workflow("branch", "branch-a");
+  expect(host.textContent).toContain("Branch delivery");
+  expect(host.textContent).toContain("Assign driver");
+  expect(host.textContent).toContain("Dispatch reserved pairs");
+  expect(host.textContent).not.toContain("Fulfilment");
+  expect(host.textContent).not.toContain("Order activity");
 });
 
 function ReceiptDialog() {

@@ -30,6 +30,31 @@ const runtime = globalThis as typeof globalThis & {
   workflowShowcaseEligible?: boolean;
 };
 const migrated = new WeakSet<PGlite>();
+// A running dev server can observe a CLI-created migration before its SQL is saved.
+// These contracts also recover databases that previously recorded such empty files.
+const migrationContracts: Record<string, string[]> = {
+  "20261022042436_stock_planning.sql": [
+    "to_regclass('supplylink_private.stock_plans') is not null",
+    "to_regclass('supplylink_private.planning_config') is not null",
+    "to_regclass('supplylink_private.stock_observations') is not null",
+  ],
+  "20261022064710_branch_refill_requests.sql": [
+    "to_regclass('supplylink_private.branch_refill_requests') is not null",
+    "to_regprocedure('supplylink_private.capture_branch_refill_request()') is not null",
+  ],
+  "20261022071904_branch_stock_pools.sql": [
+    "to_regclass('supplylink_private.branch_backup_allocations') is not null",
+    "exists(select 1 from information_schema.columns where table_schema='public' and table_name='stock_transfers' and column_name='purpose')",
+  ],
+  "20261022084937_stock_planning_workspace.sql": [
+    "to_regclass('supplylink_private.takeover_details') is not null",
+    "to_regprocedure('supplylink_private.stock_planning_workspace(text,jsonb,uuid)') is not null",
+  ],
+  "20261022090646_stock_planning_function_validation.sql": [
+    "to_regprocedure('supplylink_private.workflow_with_backup_settings(text,jsonb,uuid)') is not null",
+    "to_regprocedure('supplylink_private.refill_notifications_pre_workspace(uuid)') is not null",
+  ],
+};
 // The database survives Next.js hot reload; the migration list may be newer.
 // localRequest serializes this check with operational transactions.
 async function applyMigrations(db: PGlite) {
@@ -46,21 +71,51 @@ async function applyMigrations(db: PGlite) {
     "20261021092923_branch_location_pins.sql",
     "20261021104603_driver_pickup_tracking.sql",
     "20261021140016_branch_transfer_history.sql",
+    "20261022042436_stock_planning.sql",
+    "20261022064710_branch_refill_requests.sql",
+    "20261022071904_branch_stock_pools.sql",
+    "20261022084937_stock_planning_workspace.sql",
+    "20261022090646_stock_planning_function_validation.sql",
   ]) {
     const done = await db.query(
       "select 1 from public.workflow_migrations where name=$1",
       [name],
     );
-    if (!done.rows.length) {
-      await db.exec(
-        await readFile(
-          path.join(process.cwd(), "supabase/migrations", name),
-          "utf8",
-        ),
+    let apply = !done.rows.length;
+    const contract = migrationContracts[name];
+    if (!apply && contract) {
+      const { rows } = await db.query<{ present: boolean[] }>(
+        `select array[${contract.join(",")}] present`,
       );
-      await db.query("insert into public.workflow_migrations values($1)", [
-        name,
-      ]);
+      if (rows[0].present.every((present) => !present)) apply = true;
+      else if (!rows[0].present.every(Boolean))
+        throw new Error(
+          `Local migration ${name} has an incomplete schema. Restore or repair it before continuing.`,
+        );
+    }
+    if (apply) {
+      const sql = await readFile(
+        path.join(process.cwd(), "supabase/migrations", name),
+        "utf8",
+      );
+      const statements = sql
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*--.*$/gm, "")
+        .trim();
+      if (!statements)
+        throw new Error(
+          `Local migration ${name} has no SQL yet. Save the migration and retry.`,
+        );
+      try {
+        await db.exec(sql);
+      } catch (error) {
+        await db.exec("rollback").catch(() => {});
+        throw error;
+      }
+      await db.query(
+        "insert into public.workflow_migrations values($1) on conflict do nothing",
+        [name],
+      );
     }
   }
   migrated.add(db);
@@ -68,31 +123,46 @@ async function applyMigrations(db: PGlite) {
 async function initialize() {
   await mkdir(localRoot(), { recursive: true });
   const db = new PGlite(path.join(localRoot(), "workflow"));
-  await db.waitReady;
-  const { rows } = await db.query<{ present: string | null }>(
-    "select to_regclass('public.workflow_migrations')::text as present",
-  );
-  if (!rows[0].present) {
-    runtime.workflowShowcaseEligible = true;
-    await db.exec(supabaseStubs);
-    await db.exec(
-      "create table public.workflow_migrations(name text primary key)",
+  try {
+    await db.waitReady;
+    const { rows } = await db.query<{ present: string | null }>(
+      "select to_regclass('public.workflow_migrations')::text as present",
     );
+    if (!rows[0].present) {
+      runtime.workflowShowcaseEligible = true;
+      await db.exec(supabaseStubs);
+      await db.exec(
+        "create table public.workflow_migrations(name text primary key)",
+      );
+    }
+    await applyMigrations(db);
+    const seeded = await db.query("select 1 from public.branches limit 1");
+    if (!seeded.rows.length) {
+      await db.exec(
+        await readFile(path.join(process.cwd(), "supabase/seed.sql"), "utf8"),
+      );
+      await db.exec(
+        "insert into public.inventory(branch_id,product_id,on_hand,protected_reserve) select b.id,p.id,24,4 from public.branches b cross join public.products p where p.brand='STT' on conflict do nothing",
+      );
+      await db.exec(
+        "update public.workflow_settings set shipping_fee=5000,payment_instructions='Demo only — use a sample proof image. Do not send real money. HQ checks the simulated receiving account before approval.'",
+      );
+    }
+    return db;
+  } catch (error) {
+    await db.close().catch(() => {});
+    throw error;
   }
-  await applyMigrations(db);
-  const seeded = await db.query("select 1 from public.branches limit 1");
-  if (!seeded.rows.length) {
-    await db.exec(
-      await readFile(path.join(process.cwd(), "supabase/seed.sql"), "utf8"),
-    );
-    await db.exec(
-      "insert into public.inventory(branch_id,product_id,on_hand,protected_reserve) select b.id,p.id,24,4 from public.branches b cross join public.products p where p.brand='STT' on conflict do nothing",
-    );
-    await db.exec(
-      "update public.workflow_settings set shipping_fee=5000,payment_instructions='Demo only — use a sample proof image. Do not send real money. HQ checks the simulated receiving account before approval.'",
-    );
+}
+async function workflowDatabase() {
+  const pending = (runtime.workflowDb ??= initialize());
+  try {
+    return await pending;
+  } catch (error) {
+    // A rejected startup must not poison all future sign-in attempts until restart.
+    if (runtime.workflowDb === pending) delete runtime.workflowDb;
+    throw error;
   }
-  return db;
 }
 export async function localRequest<T>(
   actorId: string,
@@ -102,7 +172,7 @@ export async function localRequest<T>(
   const request = previous
     .catch(() => {})
     .then(async () => {
-      const db = await (runtime.workflowDb ??= initialize());
+      const db = await workflowDatabase();
       await applyMigrations(db);
       const result = await db.transaction(async (tx) => {
         const branch = await tx.query<{ id: string }>(

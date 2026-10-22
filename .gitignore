@@ -1,6 +1,8 @@
 node_modules/
 .next/
 .next-demo/
+.next-stock-planning/
+.next-stock-planning-review/
 out/
 .env*
 !.env.example

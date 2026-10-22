@@ -7,6 +7,7 @@ import {
 } from "@/lib/workflow/server";
 import type { WorkspaceQuery } from "@/lib/workflow/query";
 const publicActions = new Set([
+  "backup_configure",
   "branch_create",
   "branch_update",
   "branch_close",

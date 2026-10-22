@@ -3,6 +3,7 @@
 @import "../styles/branches.css";
 @import "../styles/checkout.css";
 @import "../styles/routing.css";
+@import "../styles/stock-planning.css";
 
 :root {
   --forest: #17493d;

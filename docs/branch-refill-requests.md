@@ -1,0 +1,19 @@
+# Automatic branch refill requests
+
+Each active branch automatically requests a refill when an active STT size/color has **fewer than 10 pairs on hand**. The threshold uses physical on-hand stock, including protected and allocated stock. It is separate from the retail-available balance and monthly wholesale backup planning.
+
+After migration `20261022071904_branch_stock_pools.sql`, a second alert monitors the dedicated **wholesale backup** pool against the HQ-configured target. A branch with 100 total pairs and 4 available backup pairs against a target of 20 raises a backup refill request even though retail stock is healthy. Alerts distinguish their affected pool. Only backup-labelled incoming transfers appear as incoming against a backup shortage. Receipt resolves a backup shortage only when available protected pairs reach the target. Target changes recalculate alerts immediately. There is one open request per branch/SKU/pool.
+
+Inventory inserts and on-hand changes maintain one durable, open request per branch/SKU. Further reductions update that request. A balance of exactly 10 or more resolves it; falling below 10 again creates a new request. Installation also creates requests for existing low balances and missing branch/SKU inventory rows (zero stock). New branches begin with zero stock and immediately request their initial refills.
+
+HQ sees **Automatic refill requested** in the notification bell, including branch, size/color, physical balance and pending incoming refill quantities. The bell count includes these requests. Selecting one opens the branch, where HQ can review all its requests and use **Refill stock**. HQ notifications and branch detail refresh every 30 seconds while the page is visible; window focus also refreshes the workspace. The branch stock screen confirms when requests have been sent to HQ.
+
+This is an in-app notification. It does not send email, SMS or operating-system push notifications. HQ chooses the quantity and authorizes the existing reserve → dispatch → physical receipt workflow. Reserving or dispatching stock does not resolve a request. A partial receipt below 10 keeps it open; a physical receipt that raises on-hand stock to 10 or more resolves it. Pending transfers are displayed so HQ can avoid ordering the same refill twice.
+
+Requests are stored in a private RLS-enabled table without direct client read/write grants. Authenticated, active HQ users can see all active branch requests; branch staff can see only their own branch's requests. SME and driver snapshots contain no refill requests. Each notification list is bounded to the latest 100 with a total count; branch detail fetches its own subset independently. Closed branches and inactive products do not appear in the active queue. Resolved requests remain stored for audit.
+
+Apply `supabase/migrations/20261022064710_branch_refill_requests.sql` after the earlier migrations for hosted use. The local demo applies it automatically. This migration adds the request table and inventory trigger, then extends the existing workspace and branch-history RPCs. It does not create transfers or change stock balances.
+
+Order popups no longer display the order-activity timeline. Pending branch backup requests display one accept/decline form without the generic Fulfilment section. Once accepted, the owning branch retains assignment, preparation, dispatch and issue controls under **Branch delivery**. Audit events remain recorded in the database.
+
+Verification covers existing low-stock backfill, strict threshold boundaries, duplicate prevention, new low-stock episodes, physical refill receipt, new branch requests, scoped RPC access, HQ bell links and counts, and the branch popup regression. Supabase security advisors additionally require a running local Supabase database or access to the hosted project.
