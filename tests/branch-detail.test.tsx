@@ -156,6 +156,38 @@ it("shows only the selected branch, its stock and its assigned drivers", async (
     expect.objectContaining({ cache: "no-store" }),
   );
 });
+
+it("shows automatic requests for this branch with the physical balance and pending incoming stock", async () => {
+  fetcher.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      rows: [],
+      pending: 1,
+      pagination: { page: 1, pageSize: 25, total: 0 },
+      refillRequestCount: 1,
+      refillRequests: [
+        {
+          id: "refill",
+          branchId,
+          branchName: "Hlaing branch",
+          productId: data.products[0].id,
+          variant: "Black · EU 38",
+          onHand: 7,
+          threshold: 10,
+          incoming: 12,
+          createdAt: "2026-10-22T06:00:00Z",
+        },
+      ],
+    }),
+  });
+  await mount();
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  });
+  expect(host.textContent).toContain("Automatic refill requests");
+  expect(host.textContent).toContain("7 pairs on hand");
+  expect(host.textContent).toContain("12 pairs in pending refills");
+});
 it("reserves a refill for the selected branch and refreshes its history", async () => {
   await mount();
   await click("Refill stock");
@@ -175,6 +207,7 @@ it("reserves a refill for the selected branch and refreshes its history", async 
       productId: data.products[0].id,
       quantity: 6,
       reason: "Weekly refill",
+      purpose: "retail",
       sourceBranchId: "",
       destinationBranchId: branchId,
     },
@@ -199,4 +232,73 @@ it("does not submit a refill above available HQ stock", async () => {
   });
   expect(action).not.toHaveBeenCalled();
   expect(host.textContent).toContain("within the available source stock");
+});
+
+it("configures an initial backup target immediately without moving retail stock by default", async () => {
+  await mount();
+  const form = host.querySelector<HTMLFormElement>("#backup-setup form")!;
+  expect(form).not.toBeNull();
+  expect(form.querySelector<HTMLInputElement>("[name=retailMove]")!.value).toBe(
+    "0",
+  );
+  form.querySelector<HTMLInputElement>("[name=target]")!.value = "80";
+  form.querySelector<HTMLInputElement>("[name=reason]")!.value =
+    "Initial emergency reserve";
+  await act(async () => {
+    form.dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
+  });
+  expect(action).toHaveBeenCalledWith(
+    "backup_configure",
+    {
+      branchId,
+      productId: data.products[0].id,
+      target: 80,
+      retailMove: 0,
+      reason: "Initial emergency reserve",
+    },
+    expect.any(String),
+    {},
+  );
+  expect(
+    host.querySelector(`a[href="/stock-planning?branchId=${branchId}"]`),
+  ).not.toBeNull();
+});
+
+it("lets HQ explicitly reserve a wholesale backup refill", async () => {
+  await mount();
+  await click("Refill stock");
+  const form = host.querySelector<HTMLFormElement>("dialog form")!;
+  const pool = [...form.querySelectorAll("select")].find((s) =>
+    [...s.options].some((o) => o.value === "backup"),
+  )!;
+  await act(async () => {
+    pool.value = "backup";
+    pool.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  form.querySelector<HTMLInputElement>("[name=quantity]")!.value = "6";
+  form.querySelector<HTMLInputElement>("[name=reason]")!.value =
+    "Emergency backup refill";
+  await act(async () => {
+    form.dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
+  });
+  expect(action.mock.calls[0][1]).toMatchObject({
+    purpose: "backup",
+    quantity: 6,
+    destinationBranchId: branchId,
+  });
+});
+
+it("opens a backup refill directly from the selected reserve setup", async () => {
+  await mount();
+  await click("Refill wholesale backup");
+  const dialog = host.querySelector("dialog")!;
+  const pool = [...dialog.querySelectorAll("select")].find((s) =>
+    [...s.options].some((o) => o.value === "backup"),
+  )!;
+  expect(pool.value).toBe("backup");
+  expect(dialog.textContent).toContain("dedicated wholesale backup pool");
 });

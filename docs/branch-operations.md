@@ -1,5 +1,15 @@
 # Branch operations
 
+## Retail and wholesale backup pools
+
+HQ supplies wholesale orders. Branches operate retail shops and hold a separate emergency wholesale reserve. A takeover can reserve only protected backup pairs for every ordered size/color; plenty of retail stock does not make an insufficient backup reserve eligible. Accepted takeover events and shortage declines feed the monthly backup planning history. Cancelling or replacing an undispatched branch order restores its committed pairs to backup. Dispatch reduces committed backup stock and physical on-hand stock while leaving retail availability unchanged.
+
+HQ sets an initial target in **Manage branch → Wholesale backup setup**. It works immediately without historical demand or a month-end plan. The default movement from existing retail stock is zero. Any deliberate reallocation must specify a quantity and reason; otherwise HQ refills the dedicated reserve using a transfer labelled **Wholesale backup stock**. Transfer receipt adds to the selected pool. Returns also specify a pool and cannot silently consume the other pool. Legacy transfers retain their previous retail-receipt behavior; existing stock balances and order history are preserved.
+
+Branch cards and stock tables show retail and wholesale backup availability separately. **Review backup suggestion** opens Stock Planning for the selected branch. Once enough complete history is available, the recorded backup-demand baseline supplies suggested targets; HQ reviews overrides and approvals. The Groq model explains saved quantities and cannot mutate stock. See [stock planning](stock-planning.md).
+
+HQ receives a low-on-hand notification below 10 pairs per SKU, and a separate backup-shortage notification whenever protected stock is below the configured reserve target. See [refill alerts](branch-refill-requests.md). Hosted use requires `20261022071904_branch_stock_pools.sql` after the earlier planning/refill migrations. The local demo applies it automatically.
+
 HQ creates each location in **Branches**, then issues a **Branch staff** account for that location in **Accounts & access**. Staff sign in at `/branch/login` using the HQ-issued account ID and temporary password. First sign-in requires a password change. Each branch sees its own stock, retail sales, transfers, affiliated drivers and deliveries; payment evidence and wholesale monetary values are hidden.
 
 ## Manage one branch

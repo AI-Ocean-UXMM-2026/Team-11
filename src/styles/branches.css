@@ -84,6 +84,30 @@
   gap: 22px;
   font-size: 13px;
 }
+.branch-pool-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.branch-pool-summary > div {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  background: #f8faf6;
+  min-width: 0;
+}
+.branch-pool-summary small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.branch-pool-summary strong {
+  display: block;
+  font-size: 23px;
+  margin-top: 6px;
+  color: var(--forest);
+}
 .branch-card-metrics span {
   display: flex;
   align-items: center;

@@ -14,6 +14,7 @@ import {
   Upload,
 } from "lucide-react";
 import { workflowAction } from "@/app/workflow-actions";
+import { planningRequest } from "@/lib/stock-planning-client";
 import {
   money,
   total,
@@ -63,6 +64,8 @@ export function OrderWorkflow({
   const [fullReceipt, setFullReceipt] = useState(false);
   const uploadRetry = useRef<{ fingerprint: string; key: string } | null>(null);
   const [backupBranch, setBackupBranch] = useState("");
+  const [declineCause, setDeclineCause] = useState("");
+  const [planningNotice, setPlanningNotice] = useState("");
   const [originalResolution, setOriginalResolution] =
     useState("returned_to_hq");
   const [consignmentResolved, setConsignmentResolved] = useState(false);
@@ -86,6 +89,18 @@ export function OrderWorkflow({
     setError("");
     start(async () => {
       try {
+        if (action === "record_unmet_backup") {
+          const result = await planningRequest({
+            action: "unmet",
+            orderId: order.id,
+            reason: payload.reason,
+            key,
+          });
+          retry.current = null;
+          setPlanningNotice(result.message);
+          await refresh();
+          return;
+        }
         const result = await workflowAction(action, body, key, query);
         if (result.error) {
           setError(result.error);
@@ -452,8 +467,9 @@ export function OrderWorkflow({
           {branch && viewer.branchId === pendingHandoff.branchId && (
             <div className="workflow-form">
               <p>
-                Accepting reserves every ordered pair from your branch. Assign
-                one of your branch drivers after acceptance.
+                Accepting reserves every ordered pair from dedicated wholesale
+                backup stock. Retail stock stays separate. Assign one of your
+                branch drivers after acceptance.
               </p>
               <button
                 className="button primary"
@@ -472,13 +488,30 @@ export function OrderWorkflow({
                   maxLength={1000}
                 />
               </label>
+              <label className="field">
+                Decline category
+                <select
+                  value={declineCause}
+                  onChange={(e) => setDeclineCause(e.target.value)}
+                >
+                  <option value="" disabled>
+                    Choose a category
+                  </option>
+                  <option value="stock_shortage">Insufficient stock</option>
+                  <option value="capacity">
+                    Delivery or staffing capacity
+                  </option>
+                  <option value="other">Other reason</option>
+                </select>
+              </label>
               <button
                 className="button secondary"
-                disabled={pending || reason.trim().length < 3}
+                disabled={pending || reason.trim().length < 3 || !declineCause}
                 onClick={() =>
                   act("handoff_decline", {
                     handoffId: pendingHandoff.id,
                     reason,
+                    declineCause,
                   })
                 }
               >
@@ -549,6 +582,18 @@ export function OrderWorkflow({
                   maxLength={1000}
                 />
               </label>
+              {order.status === "On hold" && (
+                <>
+                  <button
+                    className="button secondary"
+                    disabled={pending || reason.trim().length < 3}
+                    onClick={() => act("record_unmet_backup", { reason })}
+                  >
+                    Record no branch can fulfil
+                  </button>
+                  {planningNotice && <p role="status">{planningNotice}</p>}
+                </>
+              )}
               {w.dispatched && !w.replacementRequired && (
                 <>
                   <label className="field">
@@ -612,11 +657,11 @@ export function OrderWorkflow({
             </div>
           </details>
         )}
-      {!terminal && (
+      {!terminal && (!branch || (canFulfil && !pendingHandoff)) && (
         <section className="workflow-section">
           <h4>
             <Truck size={17} />
-            Fulfilment
+            {branch ? "Branch delivery" : "Fulfilment"}
           </h4>
           <div className="workflow-form">
             {canFulfil && ["Confirmed", "Preparing"].includes(order.status) && (
@@ -806,26 +851,6 @@ export function OrderWorkflow({
         <p className="form-error" role="alert" tabIndex={-1}>
           {error}
         </p>
-      )}
-      {!sme && !isDriver && (
-        <details className="workflow-section" open>
-          <summary>Order activity · {w.events.length} events</summary>
-          <ol className="workflow-timeline">
-            {w.events.map((e, i) => (
-              <li key={i}>
-                <strong>{e.action.replaceAll("_", " ")}</strong>
-                <small>
-                  {e.actor} ·{" "}
-                  {new Date(e.at).toLocaleString("en-GB", {
-                    timeZone: "Asia/Yangon",
-                  })}{" "}
-                  Yangon
-                </small>
-                {e.reason && <p>{e.reason}</p>}
-              </li>
-            ))}
-          </ol>
-        </details>
       )}
     </div>
   );

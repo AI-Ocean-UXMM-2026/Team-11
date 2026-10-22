@@ -107,6 +107,8 @@ export interface Branch {
   sales: number;
   stock: number;
   lowStock: number;
+  retailStock?: number;
+  backupStock?: number;
   active?: boolean;
   closedAt?: string | null;
   driverCount?: number;
@@ -117,6 +119,8 @@ export interface Branch {
     onHand: number;
     allocated: number;
     protected: number;
+    backupTarget?: number | null;
+    backupAllocated?: number;
   }[];
 }
 export interface Account {
@@ -139,7 +143,23 @@ export interface RetailSale {
   packs: number;
   date: string;
 }
+export interface RefillRequest {
+  target?: number | null;
+  unit?: string;
+  pool?: "on_hand" | "backup";
+  id: string;
+  branchId: string;
+  branchName: string;
+  productId: string;
+  variant: string;
+  onHand: number;
+  threshold: number;
+  incoming: number;
+  createdAt: string;
+}
 export interface WorkspaceData {
+  refillRequests?: RefillRequest[];
+  refillRequestCount?: number;
   query?: WorkspaceQuery;
   pagination?: Record<"orders" | "retail" | "transfers" | "report", PageInfo>;
   selectedOrder?: Order | null;
@@ -164,6 +184,7 @@ export interface WorkspaceData {
   settings?: { shipping: number | null; instructions: string; area: string };
   workflowEnabled?: boolean;
   transfers?: {
+    purpose?: "retail" | "backup";
     id: string;
     reference: string;
     sourceBranchId: string | null;
@@ -295,6 +316,7 @@ export function canAccess(role: Role, section: string) {
       "drivers",
       "accounts",
       "reports",
+      "stock-planning",
       "settings",
     ],
     sme: ["overview", "catalog", "orders", "locations", "help", "settings"],

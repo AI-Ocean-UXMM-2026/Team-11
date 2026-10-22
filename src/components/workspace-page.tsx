@@ -11,12 +11,14 @@ export async function WorkspacePage({
   requiredRole,
   branchId,
   restoreOrderId,
+  planningBranchId,
 }: {
   section: string;
   role?: string;
   requiredRole?: Role;
   branchId?: string;
   restoreOrderId?: string;
+  planningBranchId?: string;
 }) {
   const result = await loadWorkspace(
     role,
@@ -28,6 +30,11 @@ export async function WorkspacePage({
     redirect(portalHome(result.viewer.role));
   if (branchId && !result.data.branches.some((b) => b.id === branchId))
     notFound();
+  if (
+    planningBranchId &&
+    !result.data.branches.some((b) => b.id === planningBranchId)
+  )
+    notFound();
   return (
     <WorkspaceQueryProvider
       key={`${result.viewer.id}:${result.viewer.role}:${result.demo}`}
@@ -38,6 +45,7 @@ export async function WorkspacePage({
         section={section}
         branchId={branchId}
         restoreOrderId={restoreOrderId}
+        planningBranchId={planningBranchId}
       />
     </WorkspaceQueryProvider>
   );

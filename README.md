@@ -1,6 +1,9 @@
 # Supplier and Branch Wholesale Platform
 
 **Current supplier:** STT footwear only, with one Everyday sneaker model stocked by size and color.
+HQ **Stock Planning** provides a branch/SKU overview and Manage-only backup-plan drawer, manual targets and alert thresholds, evidence-based recommendations, emergency takeover history, and deduplicated backup refills. Monthly versions and Groq explanations remain available inside the drawer. See [stock planning and setup](docs/stock-planning.md).
+Branches automatically request refills when a size/color falls below 10 pairs on hand. HQ receives in-app notifications and reviews pending stock transfers before refilling. See [automatic refill requests](docs/branch-refill-requests.md).
+Branch retail stock and wholesale backup reserves are separate. Takeovers consume backup stock only. HQ can set starting targets immediately, send a refill to either pool, and review a branch-specific backup suggestion once history is available. Backup shortages also notify HQ against the configured target. See [branch stock pools](docs/branch-operations.md#retail-and-wholesale-backup-pools).
 SMEs and Drivers now have dedicated sign-in pages using HQ-issued credentials. See the
 [portal endpoints and demo credential walkthrough](docs/stt-portals.md).
 
@@ -28,12 +31,12 @@ Registered drivers share their location during assigned deliveries. Headquarters
 
 ## User roles
 
-| Role | Responsibilities |
-| --- | --- |
-| SME | Register business details; browse products, wholesale prices, locations, and FAQs; order stock; pay the full order total and upload proof; track delivery; confirm receipt; view order history. |
-| Headquarters | Manage catalog, prices, branches, and FAQs; verify full payments; allocate stock; approve drivers; control orders and delivery assignments; generate consolidated reports. |
-| Branch Staff | Record retail sales and stock movements; view sales history; generate monthly reports; accept approved wholesale backup assignments. |
-| Driver | Register for headquarters approval; view assigned deliveries; share location during delivery; report issues and handover. |
+| Role         | Responsibilities                                                                                                                                                                                |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SME          | Register business details; browse products, wholesale prices, locations, and FAQs; order stock; pay the full order total and upload proof; track delivery; confirm receipt; view order history. |
+| Headquarters | Manage catalog, prices, branches, and FAQs; verify full payments; allocate stock; approve drivers; control orders and delivery assignments; generate consolidated reports.                      |
+| Branch Staff | Record retail sales and stock movements; view sales history; generate monthly reports; accept approved wholesale backup assignments.                                                            |
+| Driver       | Register for headquarters approval; view assigned deliveries; share location during delivery; report issues and handover.                                                                       |
 
 HQ and branch drivers use the same Driver role, with their affiliation and assignment determining access. Walk-in retail customers do not need accounts.
 
@@ -74,17 +77,17 @@ flowchart TD
 
 ## Order statuses
 
-| Status | Meaning |
-| --- | --- |
-| Draft | SME is preparing the order. |
-| Awaiting verification | Full payment evidence is awaiting headquarters review. |
-| Confirmed | Full payment has been approved and stock reserved. |
-| Preparing | The assigned location is preparing the goods. |
-| Shipping | An active delivery attempt has been dispatched. |
-| On hold | A recorded issue needs resolution before normal fulfilment continues. |
-| Complete | Headquarters has completed its fulfilment work; SME receipt may still be pending. |
-| Done | Headquarters completion and SME receipt are confirmed, with no unresolved issue. |
-| Cancelled | The order is cancelled, with stock release and payment follow-up recorded. |
+| Status                | Meaning                                                                           |
+| --------------------- | --------------------------------------------------------------------------------- |
+| Draft                 | SME is preparing the order.                                                       |
+| Awaiting verification | Full payment evidence is awaiting headquarters review.                            |
+| Confirmed             | Full payment has been approved and stock reserved.                                |
+| Preparing             | The assigned location is preparing the goods.                                     |
+| Shipping              | An active delivery attempt has been dispatched.                                   |
+| On hold               | A recorded issue needs resolution before normal fulfilment continues.             |
+| Complete              | Headquarters has completed its fulfilment work; SME receipt may still be pending. |
+| Done                  | Headquarters completion and SME receipt are confirmed, with no unresolved issue.  |
+| Cancelled             | The order is cancelled, with stock release and payment follow-up recorded.        |
 
 Rejected payment evidence can be corrected and resubmitted. Payment review, fulfilment status, SME receipt, and delivery issues are maintained separately.
 
@@ -115,10 +118,10 @@ The initial web demo requires the tracking page in the foreground. Locking the p
 
 An order can have multiple delivery attempts in its history, with only one active attempt for the MVP.
 
-| Attempt type | Dispatch source | Tracking source |
-| --- | --- | --- |
-| Headquarters delivery | Headquarters warehouse | Assigned HQ driver |
-| Branch backup delivery | Selected branch | Assigned branch driver |
+| Attempt type           | Dispatch source        | Tracking source        |
+| ---------------------- | ---------------------- | ---------------------- |
+| Headquarters delivery  | Headquarters warehouse | Assigned HQ driver     |
+| Branch backup delivery | Selected branch        | Assigned branch driver |
 
 When a shipment encounters a problem:
 
@@ -145,13 +148,13 @@ If the same driver and parcel continue after a delay, resume the original attemp
 
 ## Reports and exports
 
-| Report | Required output |
-| --- | --- |
-| Branch retail sales | Daily, monthly, yearly, or custom-period history; monthly sales value, units, transaction count, and product breakdown. |
-| Headquarters summary | Branch comparisons, retail and wholesale totals, product performance, and combined net merchandise sales. |
+| Report               | Required output                                                                                                                  |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Branch retail sales  | Daily, monthly, yearly, or custom-period history; monthly sales value, units, transaction count, and product breakdown.          |
+| Headquarters summary | Branch comparisons, retail and wholesale totals, product performance, and combined net merchandise sales.                        |
 | Wholesale operations | Orders created in the period and their current statuses, plus a separately labelled count of orders reaching Done in the period. |
-| Delivery and backup | HQ and branch dispatch attempts, distinct backup-served orders, hold reasons, and hold durations. |
-| Payment review | Pending, rejected, and approved evidence counts; verified full payment amounts by approval date. |
+| Delivery and backup  | HQ and branch dispatch attempts, distinct backup-served orders, hold reasons, and hold durations.                                |
+| Payment review       | Pending, rejected, and approved evidence counts; verified full payment amounts by approval date.                                 |
 
 Generate on-screen reports and CSV exports using the same filters and event cutoff. Headquarters can filter across branches; branch staff can access only their own branch reports. Include report period, timezone, currency, generation time, and relevant source references.
 

@@ -51,7 +51,7 @@ const branchDriver=initial.data.accounts.find(a=>a.username==='aungthu');
 if(branchMode){
   await act('hq','driver_affiliation',{driverId:branchDriver.id,branchId:targetBranch.id,reason:'Demo branch verification'});
   await login('driver','aungthu','branchdriver');
-  const transfer=await act('hq','transfer_create',{productId:product.id,quantity:2,sourceBranchId:'',destinationBranchId:targetBranch.id,reason:'Demo branch refill'});
+  const transfer=await act('hq','transfer_create',{productId:product.id,quantity:2,purpose:'backup',sourceBranchId:'',destinationBranchId:targetBranch.id,reason:'Demo branch backup refill'});
   await act('hq','transfer_dispatch',{transferId:transfer.result.transferId,confirmed:true});
   await act('branch','transfer_receive',{transferId:transfer.result.transferId,confirmed:true});
 }
