@@ -17,7 +17,7 @@ Demo authentication remains process-local: sample users return after a restart; 
 3. HQ opens **Wholesale orders**, views the private proof and checks the actual receiving account. Enter the actual received amount and explicitly confirm the account check. Approval requires the full quote including shipping. Rejection requires a reason; the SME can resubmit.
 4. HQ approval allocates every SKU in one transaction, or allocates none. If stock has run out, payment approval remains recorded and the order stays Awaiting verification. HQ can replenish and retry reservation, or cancel with refund follow-up.
 5. HQ selects an active driver with completed account setup, starts preparation, then dispatches. Dispatch consumes the reserved pairs once. An assigned driver sees receiver/parcel details and no order prices or proof images.
-6. The driver confirms pickup to start delivery and foreground GPS sharing, then reports handover. SME confirms actual full receipt. HQ confirms fulfilment completion after handover. Either confirmation can arrive first; **Done** and the wholesale sales event require both, with no open issue.
+6. The driver confirms pickup to start delivery and foreground GPS sharing, then reports handover. SME confirms actual receipt. Either confirmation can arrive first; **Done** and the wholesale sales event require driver handover and SME receipt for all quantities, with no open issue. No HQ completion action is required. [Phased fulfilment](phased-fulfilment.md) supports a partial branch delivery and later reassignment of outstanding pairs under one order.
 7. HQ, the assigned driver or the ordering SME can report an issue during delivery. Only HQ resolves the hold with a reason. Cancellation before dispatch releases allocations; verified payments are flagged for separate refund follow-up. The application never transfers or refunds money.
 
 The workspace refreshes stale data on returning to the app or reconnecting. There is no interval polling. An order also has a manual refresh control. Foreground GPS starts after driver-confirmed pickup; see [driver tracking](driver-tracking.md).
@@ -41,7 +41,7 @@ All operations require an active cookie session with completed first-login setup
 
 POST requires a matching Origin/Host. A retry key is bound to the actor, operation and payload; reuse the same key for an interrupted request. A successful replay returns its original result. Different details with that key are rejected. Proof upload retries bind the intent to the validated image digest and reuse a derived submission key.
 
-Actions: SME `create`, `receive`, `hold`, `cancel`; Driver `handover`, `hold`; HQ `configure`, `stock`, `price`, `review_payment`, `confirm`, `assign`, `prepare`, `dispatch`, `complete`, `hold`, `resolve`, `cancel`; Branch `retail`. Order state adds further restrictions. Proof intent/submission helpers are exposed only via the validated upload route in the app; direct authenticated storage writes are denied.
+Actions: SME `create`, `receive`, `hold`, `cancel`; Driver `pickup`, `handover`, `hold`; HQ `configure`, `stock`, `price`, `review_payment`, `confirm`, `assign`, `prepare`, `dispatch`, `phase_request`, `phase_cancel`, `hold`, `resolve`, `cancel`; Branch `retail`. Order state adds further restrictions. The legacy HQ `complete` action is a compatibility no-op; completion requires driver handover and SME receipt. Proof intent/submission helpers are exposed only via the validated upload route in the app; direct authenticated storage writes are denied.
 
 ## Supabase rollout
 

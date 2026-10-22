@@ -12,6 +12,7 @@ export const workspaceQuerySchema = z.object({
   status: z
     .enum([
       "All orders",
+      "Order remaining",
       "Draft",
       "Awaiting verification",
       "Confirmed",

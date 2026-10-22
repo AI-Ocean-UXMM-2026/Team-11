@@ -91,6 +91,29 @@ async function handler() {
 const request = () =>
   new Request(`http://localhost:3100/api/orders/${id}/route`);
 const context = { params: Promise.resolve({ id }) };
+it("uses only the authorized stop prefix and never reuses a full-route cache for a customer", async () => {
+  const get = await handler();
+  const first = { position: 1, own: true, pin: data.destination };
+  const later = {
+    position: 2,
+    own: false,
+    pin: { latitude: 16.9, longitude: 96.2 },
+  };
+  mocks.actor.mockResolvedValue({ id: "hq", role: "hq" });
+  mocks.tracking.mockResolvedValue({ ...data, run: { stops: [first, later] } });
+  const full = await (await get(request(), context)).json();
+  expect(full.data.route.destination).toEqual(later.pin);
+  expect(String(mocks.fetch.mock.calls[0][0])).toContain(
+    "96.1,16.8;96.12,16.81;96.2,16.9",
+  );
+  mocks.actor.mockResolvedValue({ id: "sme", role: "sme" });
+  mocks.tracking.mockResolvedValue({ ...data, run: { stops: [first] } });
+  const own = await (await get(request(), context)).json();
+  expect(own.data.route.destination).toEqual(first.pin);
+  expect(mocks.fetch).toHaveBeenCalledTimes(2);
+  expect(String(mocks.fetch.mock.calls[1][0])).not.toContain("96.2,16.9");
+});
+
 it("uses only authorized stored coordinates and rechecks access before cache hits", async () => {
   const get = await handler();
   const result = await get(new Request(`${request().url}?origin=0,0`), context);

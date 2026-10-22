@@ -21,8 +21,11 @@ const runtime = globalThis as typeof globalThis & {
   workflowShowcaseEligible?: boolean;
 };
 let db: PGlite;
-beforeEach(() => {
+beforeEach(async () => {
   state.empty = false;
+  // Database construction is fixture setup, not part of the recovery operation.
+  // Keep the assertions under the normal timeout as the migration chain grows.
+  await existingDatabase();
 });
 afterEach(async () => {
   delete runtime.workflowDb;
@@ -60,7 +63,6 @@ const request = () =>
       ).rows[0].table_name,
   );
 it("repairs an empty migration recorded as complete and preserves existing database rows", async () => {
-  await existingDatabase();
   await db.query("insert into public.workflow_migrations values($1)", [
     pending,
   ]);
@@ -78,7 +80,6 @@ it("repairs an empty migration recorded as complete and preserves existing datab
   expect(await request()).toBe("supplylink_private.branch_refill_requests");
 });
 it("refuses empty/comment-only migration files and retries after their SQL is saved", async () => {
-  await existingDatabase();
   state.empty = true;
   await expect(request()).rejects.toThrow(/has no SQL yet/);
   expect(
@@ -92,7 +93,6 @@ it("refuses empty/comment-only migration files and retries after their SQL is sa
   expect(await request()).toBe("supplylink_private.branch_refill_requests");
 });
 it("stops on a partially present schema instead of blindly replaying destructive renames", async () => {
-  await existingDatabase();
   await db.exec(
     "create table supplylink_private.branch_refill_requests(id uuid)",
   );
@@ -110,6 +110,6 @@ it("clears a rejected initialization promise so later sign-ins can recover", asy
   runtime.workflowDb = failure;
   await expect(request()).rejects.toThrow("Startup failed");
   expect(runtime.workflowDb).toBeUndefined();
-  await existingDatabase();
+  runtime.workflowDb = Promise.resolve(db);
   expect(await request()).toBe("supplylink_private.branch_refill_requests");
 });

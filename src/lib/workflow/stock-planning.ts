@@ -8,6 +8,7 @@ import { type Viewer } from "../domain";
 import {
   GROQ_STOCK_MODEL,
   explanationInput,
+  type TakeoverReportPage,
   type StockPlan,
 } from "../stock-planning";
 import { z } from "zod";
@@ -48,6 +49,39 @@ export async function planningRpc<T>(
       error.code === "PGRST202" ? 503 : 400,
     );
   return data;
+}
+
+export async function takeoverReportPage(
+  actor: Viewer,
+  page: number,
+): Promise<TakeoverReportPage> {
+  if (actor.role !== "hq")
+    throw new WorkflowError("Takeover history is restricted to HQ.", 403);
+  if (!Number.isInteger(page) || page < 1 || page > 1000000)
+    throw new WorkflowError("Choose a valid takeover history page.");
+  if (isDemoMode())
+    return localRequest(actor.id, async (tx) =>
+      (
+        await tx.query<{ result: TakeoverReportPage }>(
+          "select public.stock_planning_takeover_report($1::integer,25) result",
+          [page],
+        )
+      ).rows[0].result,
+    );
+  const { data, error } = await (
+    await createClient()
+  ).rpc("stock_planning_takeover_report", {
+    p_page: page,
+    p_page_size: 25,
+  });
+  if (error)
+    throw new WorkflowError(
+      error.code === "PGRST202"
+        ? "Apply the takeover Reports migration before loading this history."
+        : error.message,
+      error.code === "PGRST202" ? 503 : 400,
+    );
+  return data as TakeoverReportPage;
 }
 
 const explanationSchema = z

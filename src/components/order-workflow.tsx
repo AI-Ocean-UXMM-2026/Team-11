@@ -4,6 +4,9 @@ import { PaymentDestinations } from "./payment-destinations";
 import { LocationLink } from "./location-link";
 import { DeliveryTracking } from "./delivery-tracking";
 import { useDriverTracking } from "./driver-tracking-provider";
+import { useQueryClient } from "@tanstack/react-query";
+import { DriverGroupPickup } from "./driver-group-pickup";
+import { PhasedFulfilment } from "./phased-fulfilment";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   CheckCircle2,
@@ -15,6 +18,7 @@ import {
 } from "lucide-react";
 import { workflowAction } from "@/app/workflow-actions";
 import { planningRequest } from "@/lib/stock-planning-client";
+import { readTracking } from "@/lib/tracking-client";
 import {
   money,
   total,
@@ -53,7 +57,9 @@ export function OrderWorkflow({
   updated: (data: WorkspaceData, message?: string) => void | Promise<void>;
 }) {
   const w = order.workflow;
+  const deliveryStatus = w?.fulfilment?.deliveryStatus ?? order.status;
   const tracker = useDriverTracking();
+  const queryClient = useQueryClient();
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const retry = useRef<{ fingerprint: string; key: string } | null>(null);
@@ -79,9 +85,13 @@ export function OrderWorkflow({
   const privateFinance = hq || sme;
   const pendingHandoff = w.handoffs?.find((h) => h.status === "pending");
   const latest = w.evidence[0];
-  const terminal = ["Done", "Cancelled"].includes(order.status);
+  const terminal = ["Done", "Cancelled"].includes(deliveryStatus);
   function act(action: string, payload: Record<string, unknown> = {}) {
-    const body = { orderId: order.id, ...payload };
+    const body = {
+      orderId: order.id,
+      ...(w?.fulfilment?.current ? { phaseId: w.fulfilment.current.id } : {}),
+      ...payload,
+    };
     const fingerprint = JSON.stringify([action, body]);
     if (retry.current?.fingerprint !== fingerprint)
       retry.current = { fingerprint, key: crypto.randomUUID() };
@@ -107,8 +117,20 @@ export function OrderWorkflow({
           return;
         }
         retry.current = null;
-        if (action === "handover" && tracker.trip?.orderId === order.id)
-          tracker.end();
+        if (viewer.role === "driver")
+          void queryClient.invalidateQueries({
+            queryKey: ["driver-delivery-groups", viewer.id, demo],
+          });
+        if (action === "handover" && tracker.trip?.orderId === order.id) {
+          try {
+            const next = await readTracking(order.id);
+            if (next.run?.publisher)
+              tracker.begin({ ...tracker.trip, ...next.run.publisher });
+            else tracker.end();
+          } catch {
+            tracker.end();
+          }
+        }
         if (action === "pickup" && result.result?.attemptId)
           tracker.begin({
             orderId: order.id,
@@ -124,10 +146,12 @@ export function OrderWorkflow({
               result.data.selectedOrder ??
               result.data.orders.find((item) => item.id === order.id);
             onReceiptConfirmed?.(
-              `Full receipt confirmed for ${order.reference}. ${
+              `${w?.fulfilment?.current ? `Phase ${w.fulfilment.current.number} receipt recorded` : "Full receipt confirmed"} for ${order.reference}. ${
                 receivedOrder?.status === "Done"
                   ? "Your order is complete."
-                  : "Awaiting HQ completion."
+                  : receivedOrder?.workflow?.fulfilment?.remaining
+                    ? `${receivedOrder.workflow.fulfilment.remaining} pairs remaining.`
+                    : "Awaiting driver handover."
               }`,
             );
           }
@@ -215,6 +239,13 @@ export function OrderWorkflow({
         <RefreshCw size={14} />
         Refresh status
       </button>
+      <PhasedFulfilment
+        order={order}
+        viewer={viewer}
+        branches={branches}
+        pending={pending}
+        act={act}
+      />
       <ul className="workflow-lines">
         {w.lines.map((l) => (
           <li key={l.productId}>
@@ -263,25 +294,27 @@ export function OrderWorkflow({
         </div>
       )}
       {sme && w.driverName && <p className="muted">Driver: {w.driverName}</p>}
-      {(hq || sme || isDriver) && w.attemptId && (
-        <>
-          {isDriver && (
-            <Link
-              className="button secondary open-delivery-view"
-              href={`/driver/deliveries/${order.id}?from=${deliveryOrigin}`}
-            >
-              Open delivery view
-            </Link>
-          )}
-          {locationPanel}
-        </>
-      )}
+      {(hq || sme || isDriver) &&
+        w.attemptId &&
+        (!w.fulfilment || w.fulfilment.current?.attemptId === w.attemptId) && (
+          <>
+            {isDriver && (
+              <Link
+                className="button secondary open-delivery-view"
+                href={`/driver/deliveries/${order.id}?from=${deliveryOrigin}`}
+              >
+                Open delivery view
+              </Link>
+            )}
+            {locationPanel}
+          </>
+        )}
       {privateFinance && (
         <div className="workflow-checks">
           {[
             [w.paymentVerified, "Payment verified"],
             [w.reserved, "Stock reserved"],
-            [w.hqComplete, "HQ complete"],
+            [w.handover || order.status === "Done", "Driver handover"],
             [w.received, "SME received"],
           ].map(([done, label]) => (
             <span key={String(label)} className={done ? "checked" : ""}>
@@ -340,7 +373,7 @@ export function OrderWorkflow({
           ))}
           {sme &&
             !w.paymentVerified &&
-            ["Draft", "Awaiting verification"].includes(order.status) && (
+            ["Draft", "Awaiting verification"].includes(deliveryStatus) && (
               <form
                 className="workflow-form"
                 onSubmit={(e) => {
@@ -391,7 +424,7 @@ export function OrderWorkflow({
             )}
           {hq &&
             latest?.status === "pending" &&
-            order.status === "Awaiting verification" &&
+            deliveryStatus === "Awaiting verification" &&
             !w.paymentVerified && (
               <div className="workflow-form">
                 <label className="field">
@@ -457,6 +490,7 @@ export function OrderWorkflow({
           </button>
         </section>
       )}
+
       {pendingHandoff && (
         <section className="workflow-section">
           <h4>Backup request · {pendingHandoff.branchName}</h4>
@@ -467,9 +501,12 @@ export function OrderWorkflow({
           {branch && viewer.branchId === pendingHandoff.branchId && (
             <div className="workflow-form">
               <p>
-                Accepting reserves every ordered pair from dedicated wholesale
-                backup stock. Retail stock stays separate. Assign one of your
-                branch drivers after acceptance.
+                Accepting reserves{" "}
+                {w.fulfilment?.current
+                  ? `only the ${w.fulfilment.current.pairs} pairs in phase ${w.fulfilment.current.number}`
+                  : "every ordered pair"}{" "}
+                from dedicated wholesale backup stock. Retail stock stays
+                separate. Assign one of your branch drivers after acceptance.
               </p>
               <button
                 className="button primary"
@@ -478,7 +515,9 @@ export function OrderWorkflow({
                   act("handoff_accept", { handoffId: pendingHandoff.id })
                 }
               >
-                Accept & reserve branch stock
+                {w.fulfilment?.current
+                  ? `Accept & reserve ${w.fulfilment.current.pairs} pairs`
+                  : "Accept & reserve branch stock"}
               </button>
               <label className="field">
                 Reason if declining
@@ -546,13 +585,14 @@ export function OrderWorkflow({
         </section>
       )}
       {hq &&
+        !w.fulfilment &&
+        (w.sourceBranchId || w.dispatched) &&
         !terminal &&
         !w.handoffPending &&
         w.paymentVerified &&
         w.reserved &&
         !w.received &&
-        !w.hqComplete &&
-        ["Confirmed", "Preparing", "On hold"].includes(order.status) && (
+        ["Confirmed", "Preparing", "On hold"].includes(deliveryStatus) && (
           <details className="workflow-section">
             <summary>Arrange fulfilment from a branch</summary>
             <div className="workflow-form">
@@ -582,7 +622,7 @@ export function OrderWorkflow({
                   maxLength={1000}
                 />
               </label>
-              {order.status === "On hold" && (
+              {deliveryStatus === "On hold" && (
                 <>
                   <button
                     className="button secondary"
@@ -657,196 +697,211 @@ export function OrderWorkflow({
             </div>
           </details>
         )}
-      {!terminal && (!branch || (canFulfil && !pendingHandoff)) && (
-        <section className="workflow-section">
-          <h4>
-            <Truck size={17} />
-            {branch ? "Branch delivery" : "Fulfilment"}
-          </h4>
-          <div className="workflow-form">
-            {canFulfil && ["Confirmed", "Preparing"].includes(order.status) && (
-              <>
-                <label className="field">
-                  Assign driver
-                  <select
-                    value={driver}
-                    onChange={(e) => setDriver(e.target.value)}
-                  >
-                    <option value="">Choose an active driver</option>
-                    {accounts
-                      .filter(
-                        (a) =>
-                          a.role === "driver" &&
-                          a.status === "Active" &&
-                          (a.branchId ?? null) === (w.sourceBranchId ?? null),
-                      )
-                      .map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name} · {a.username}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <button
-                  className="button secondary"
-                  disabled={pending || !driver}
-                  onClick={() => act("assign", { driverId: driver })}
-                >
-                  Save driver assignment
-                </button>
-              </>
-            )}
-            <div className="workflow-buttons">
-              {canFulfil && order.status === "Confirmed" && (
-                <button
-                  className="button primary"
-                  disabled={pending}
-                  onClick={() => act("prepare")}
-                >
-                  Start preparation
-                </button>
-              )}
-              {canFulfil && order.status === "Preparing" && (
-                <button
-                  className="button primary"
-                  disabled={pending || !w.driverId}
-                  onClick={() => act("dispatch")}
-                >
-                  Dispatch reserved pairs
-                </button>
-              )}
-              {isDriver &&
-                order.status === "Shipping" &&
-                !w.handover &&
-                !w.pickedUpAt && (
-                  <div>
-                    <p className="muted">
-                      Confirm once you have the parcel. Your live location will
-                      be shared with HQ and this order’s SME while Supply Link
-                      stays open. Allow GPS when asked; you can pause sharing.
-                    </p>
+      {!terminal &&
+        (!w.fulfilment ||
+          (!!w.fulfilment.current &&
+            w.fulfilment.current.state !== "requested")) &&
+        (!branch || (canFulfil && !pendingHandoff)) && (
+          <section className="workflow-section">
+            <h4>
+              <Truck size={17} />
+              {branch ? "Branch delivery" : "Fulfilment"}
+            </h4>
+            <div className="workflow-form">
+              {canFulfil &&
+                ["Confirmed", "Preparing"].includes(deliveryStatus) && (
+                  <>
+                    <label className="field">
+                      Assign driver
+                      <select
+                        value={driver}
+                        onChange={(e) => setDriver(e.target.value)}
+                      >
+                        <option value="">Choose an active driver</option>
+                        {accounts
+                          .filter(
+                            (a) =>
+                              a.role === "driver" &&
+                              a.status === "Active" &&
+                              (a.branchId ?? null) ===
+                                (w.sourceBranchId ?? null),
+                          )
+                          .map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name} · {a.username}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
                     <button
-                      type="button"
-                      className="button primary"
-                      disabled={pending || !!w.issue}
-                      onClick={() => act("pickup")}
+                      className="button secondary"
+                      disabled={pending || !driver}
+                      onClick={() => act("assign", { driverId: driver })}
                     >
-                      Confirm pickup & start delivery
+                      Save driver assignment
                     </button>
-                  </div>
+                  </>
                 )}
-              {isDriver &&
-                order.status === "Shipping" &&
-                !w.handover &&
-                !!w.pickedUpAt && (
+              <div className="workflow-buttons">
+                {canFulfil && deliveryStatus === "Confirmed" && (
                   <button
                     className="button primary"
                     disabled={pending}
-                    onClick={() => act("handover")}
+                    onClick={() => act("prepare")}
                   >
-                    Report delivery handover
+                    Start preparation
                   </button>
                 )}
-              {hq && order.status === "Shipping" && (
-                <button
-                  className="button primary"
-                  disabled={pending || !w.handover}
-                  onClick={() => act("complete")}
-                >
-                  Confirm HQ completion
-                </button>
-              )}
-            </div>
-            {sme &&
-              ["Shipping", "Complete"].includes(order.status) &&
-              !w.received && (
-                <>
-                  <label className="workflow-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={fullReceipt}
-                      onChange={(e) => setFullReceipt(e.target.checked)}
-                    />
-                    I received every ordered pair, in full.
-                  </label>
+                {canFulfil && deliveryStatus === "Preparing" && (
                   <button
                     className="button primary"
-                    disabled={pending || !fullReceipt}
-                    onClick={() => act("receive", { fullReceipt })}
+                    disabled={pending || !w.driverId}
+                    onClick={() => act("dispatch")}
                   >
-                    Confirm full receipt
-                  </button>
-                </>
-              )}
-            {order.status === "Complete" && !w.received && (
-              <p className="muted">
-                HQ is complete. The SME must confirm full receipt before this
-                becomes Done.
-              </p>
-            )}
-            {w.received && !w.hqComplete && (
-              <p className="muted">
-                SME receipt recorded. Waiting for HQ completion.
-              </p>
-            )}
-            {isDriver && !["Shipping", "On hold"].includes(order.status) && (
-              <p className="muted">
-                HQ will dispatch this order after preparation.
-              </p>
-            )}
-            <label className="field">
-              Issue, rejection or cancellation reason
-              <textarea
-                value={reason}
-                maxLength={1000}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Describe what happened and the required follow-up"
-              />
-            </label>
-            <div className="workflow-buttons">
-              {["Preparing", "Shipping", "Complete"].includes(order.status) &&
-                !(sme && order.status === "Preparing") && (
-                  <button
-                    className="button secondary"
-                    disabled={pending || reason.trim().length < 3}
-                    onClick={() => act("hold", { reason })}
-                  >
-                    Report issue / hold
+                    Dispatch reserved pairs
                   </button>
                 )}
-              {hq && order.status === "On hold" && (
-                <button
-                  className="button primary"
-                  disabled={
-                    pending ||
-                    reason.trim().length < 3 ||
-                    w.handoffPending ||
-                    w.replacementRequired
-                  }
-                  onClick={() => act("resolve", { reason })}
-                >
-                  Record resolution & resume
-                </button>
+                {isDriver &&
+                  deliveryStatus === "Shipping" &&
+                  !w.handover &&
+                  !w.pickedUpAt && (
+                    <DriverGroupPickup
+                      viewer={viewer}
+                      demo={demo}
+                      refresh={refresh}
+                      orderId={order.id}
+                      from={deliveryOrigin}
+                      fallback={
+                        <div>
+                          <p className="muted">
+                            Confirm once you have the parcel. Your live location
+                            will be shared with HQ and this order’s SME while
+                            Supply Link stays open. Allow GPS when asked; you
+                            can pause sharing.
+                          </p>
+                          <button
+                            type="button"
+                            className="button primary"
+                            disabled={pending || !!w.issue}
+                            onClick={() => act("pickup")}
+                          >
+                            Confirm pickup & start delivery
+                          </button>
+                        </div>
+                      }
+                    />
+                  )}
+                {isDriver &&
+                  deliveryStatus === "Shipping" &&
+                  !w.handover &&
+                  !!w.pickedUpAt && (
+                    <button
+                      className="button primary"
+                      disabled={pending}
+                      onClick={() => act("handover")}
+                    >
+                      Report delivery handover
+                    </button>
+                  )}
+              </div>
+              {sme &&
+                ["Shipping", "Complete"].includes(deliveryStatus) &&
+                !w.received &&
+                !w.fulfilment?.current?.received && (
+                  <>
+                    <label className="workflow-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={fullReceipt}
+                        onChange={(e) => setFullReceipt(e.target.checked)}
+                      />
+                      {w.fulfilment?.current
+                        ? `I received all ${w.fulfilment.current.pairs} pairs in phase ${w.fulfilment.current.number}.`
+                        : "I received every ordered pair, in full."}
+                    </label>
+                    <button
+                      className="button primary"
+                      disabled={pending || !fullReceipt}
+                      onClick={() => act("receive", { fullReceipt })}
+                    >
+                      {w.fulfilment?.current
+                        ? `Confirm phase ${w.fulfilment.current.number} receipt`
+                        : "Confirm full receipt"}
+                    </button>
+                  </>
+                )}
+              {deliveryStatus === "Complete" && !w.received && (
+                <p className="muted">
+                  Driver handover and SME receipt are required before this
+                  becomes Done.
+                </p>
               )}
-              {(hq || (sme && !w.reserved && !w.paymentVerified)) &&
-                [
-                  "Draft",
-                  "Awaiting verification",
-                  "Confirmed",
-                  "Preparing",
-                ].includes(order.status) && (
+              {w.received && !w.handover && order.status !== "Done" && (
+                <p className="muted">
+                  SME receipt recorded. Waiting for driver handover.
+                </p>
+              )}
+              {isDriver &&
+                !["Shipping", "On hold"].includes(deliveryStatus) && (
+                  <p className="muted">
+                    HQ will dispatch this order after preparation.
+                  </p>
+                )}
+              <label className="field">
+                Issue, rejection or cancellation reason
+                <textarea
+                  value={reason}
+                  maxLength={1000}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Describe what happened and the required follow-up"
+                />
+              </label>
+              <div className="workflow-buttons">
+                {["Preparing", "Shipping", "Complete"].includes(
+                  deliveryStatus,
+                ) &&
+                  !(sme && deliveryStatus === "Preparing") && (
+                    <button
+                      className="button secondary"
+                      disabled={pending || reason.trim().length < 3}
+                      onClick={() => act("hold", { reason })}
+                    >
+                      Report issue / hold
+                    </button>
+                  )}
+                {hq && deliveryStatus === "On hold" && (
                   <button
-                    className="button secondary"
-                    disabled={pending || reason.trim().length < 3}
-                    onClick={() => act("cancel", { reason })}
+                    className="button primary"
+                    disabled={
+                      pending ||
+                      reason.trim().length < 3 ||
+                      w.handoffPending ||
+                      w.replacementRequired
+                    }
+                    onClick={() => act("resolve", { reason })}
                   >
-                    Cancel order
+                    Record resolution & resume
                   </button>
                 )}
+                {(hq || (sme && !w.reserved && !w.paymentVerified)) &&
+                  [
+                    "Draft",
+                    "Awaiting verification",
+                    "Confirmed",
+                    "Preparing",
+                  ].includes(deliveryStatus) && (
+                    <button
+                      className="button secondary"
+                      disabled={pending || reason.trim().length < 3}
+                      onClick={() => act("cancel", { reason })}
+                    >
+                      Cancel order
+                    </button>
+                  )}
+              </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )}
       {error && (
         <p className="form-error" role="alert" tabIndex={-1}>
           {error}

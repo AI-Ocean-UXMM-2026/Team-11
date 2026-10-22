@@ -54,6 +54,18 @@ const migrationContracts: Record<string, string[]> = {
     "to_regprocedure('supplylink_private.workflow_with_backup_settings(text,jsonb,uuid)') is not null",
     "to_regprocedure('supplylink_private.refill_notifications_pre_workspace(uuid)') is not null",
   ],
+  "20261022162304_stock_planning_takeover_reports.sql": [
+    "obj_description(to_regprocedure('public.stock_planning_takeover_report(integer,integer)'),'pg_proc')='HQ-only paged takeover history for the Reports workspace.'",
+  ],
+  "20261022212016_branch_physical_stock_movements.sql": [
+    "obj_description(to_regprocedure('public.record_branch_stock_movement(uuid,uuid,text,text,integer,text,uuid)'),'pg_proc')='Branch scoped physical stock movement recording.' and to_regprocedure('public.branch_stock_movement_history(uuid,integer,integer)') is not null",
+  ],
+  "20261022230000_branch_confirmed_backup_incoming.sql": [
+    "obj_description(to_regprocedure('supplylink_private.planning_catalog()'),'pg_proc')='Planning counts dispatched backup transfers as incoming until branch receipt.'",
+  ],
+  "20261023000100_branch_received_movement_records.sql": [
+    "obj_description(to_regprocedure('public.branch_stock_movement_history(uuid,integer,integer)'),'pg_proc')='Branch scoped history of physical stock additions after receipt.'",
+  ],
 };
 // The database survives Next.js hot reload; the migration list may be newer.
 // localRequest serializes this check with operational transactions.
@@ -76,6 +88,13 @@ async function applyMigrations(db: PGlite) {
     "20261022071904_branch_stock_pools.sql",
     "20261022084937_stock_planning_workspace.sql",
     "20261022090646_stock_planning_function_validation.sql",
+    "20261022110558_grouped_delivery_routes.sql",
+    "20261022121728_group_acceptance_pickup.sql",
+    "20261022133817_phased_fulfilment_two_party_completion.sql",
+    "20261022162304_stock_planning_takeover_reports.sql",
+    "20261022212016_branch_physical_stock_movements.sql",
+    "20261022230000_branch_confirmed_backup_incoming.sql",
+    "20261023000100_branch_received_movement_records.sql",
   ]) {
     const done = await db.query(
       "select 1 from public.workflow_migrations where name=$1",

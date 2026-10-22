@@ -239,14 +239,24 @@ export function StockTransfers({
   updated,
   pagination,
   title = "Refills & returns",
+  mode = "all",
 }: {
   data: WorkspaceData;
   viewer: Viewer;
   pagination?: ReactNode;
   title?: string;
+  mode?: "all" | "incoming-pending";
   updated: (data: WorkspaceData, message?: string) => void | Promise<void>;
 }) {
   const { act, pending, error } = useBranchAction(updated, data.query);
+  const transfers =
+    mode === "incoming-pending"
+      ? (data.transfers ?? []).filter(
+          (transfer) =>
+            transfer.status === "shipping" &&
+            transfer.destinationBranchId === viewer.branchId,
+        )
+      : data.transfers ?? [];
   return (
     <section className="panel stock-transfer-panel">
       <div className="panel-heading">
@@ -255,11 +265,13 @@ export function StockTransfers({
           <h2>{title}</h2>
         </div>
         <span className="count-chip">
-          {data.summary?.pendingTransfers ?? 0} pending
+          {mode === "incoming-pending"
+            ? `${transfers.length} awaiting receipt`
+            : `${data.summary?.pendingTransfers ?? 0} pending`}
         </span>
       </div>
       <div className="transfer-list">
-        {data.transfers?.map((t) => {
+        {transfers.map((t) => {
           const source =
             viewer.role === "hq"
               ? t.sourceBranchId === null
@@ -346,10 +358,11 @@ export function StockTransfers({
             </details>
           );
         })}
-        {!data.transfers?.length && (
+        {!transfers.length && (
           <p className="info-pad muted">
-            No stock transfers yet. Incoming stock becomes available only after
-            receipt confirmation.
+            {mode === "incoming-pending"
+              ? "No incoming stock is waiting for your receipt confirmation."
+              : "No stock transfers yet. Incoming stock becomes available only after receipt confirmation."}
           </p>
         )}
       </div>

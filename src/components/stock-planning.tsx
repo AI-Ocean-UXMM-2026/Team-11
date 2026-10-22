@@ -2,11 +2,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   AlertTriangle,
+  CircleHelp,
   Info,
   PackagePlus,
   RefreshCw,
-  Sparkles,
   X,
 } from "lucide-react";
 import type { Viewer, WorkspaceData } from "@/lib/domain";
@@ -47,7 +48,6 @@ export function StockPlanning({
   demo,
   updated,
   initialBranchId,
-  openOrder,
 }: {
   data: WorkspaceData;
   viewer: Viewer;
@@ -288,6 +288,7 @@ export function StockPlanning({
           key={`${selected.branchId}:${selected.productId}`}
           initial={selected}
           area={area}
+          setArea={setArea}
           viewer={viewer}
           demo={demo}
           close={() => {
@@ -295,7 +296,6 @@ export function StockPlanning({
             trigger.current?.focus();
           }}
           updated={updated}
-          openOrder={openOrder}
           refreshOverview={async () => {
             await query.refetch();
           }}
@@ -308,29 +308,32 @@ export function StockPlanning({
 function BackupDrawer({
   initial,
   area,
+  setArea,
   viewer,
   demo,
   close,
   updated,
   refreshOverview,
-  openOrder,
 }: {
   initial: BackupPlanningRow;
   area: string;
+  setArea: (area: string) => void;
   viewer: Viewer;
   demo: boolean;
   close: () => void;
   updated: () => Promise<unknown>;
   refreshOverview: () => Promise<void>;
-  openOrder?: (id: string) => Promise<void> | void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const retry = useRef<{ fingerprint: string; key: string } | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const [takingOver, setTakingOver] = useState(false),
-    [orderId, setOrderId] = useState("");
+  const [manualNumbers, setManualNumbers] = useState(false);
+  const [showCriteria, setShowCriteria] = useState(false);
+  const [targetDraft, setTargetDraft] = useState<string | null>(null);
+  const [thresholdDraft, setThresholdDraft] = useState<string | null>(null);
   const [advanced, setAdvanced] = useState(false),
     [month, setMonth] = useState(nextPlanningMonth().slice(0, 7));
   const query = useQuery({
@@ -356,7 +359,10 @@ function BackupDrawer({
   useEffect(() => {
     const element = dialog.current;
     element?.showModal();
-    return () => element?.close();
+    return () => {
+      element?.close();
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    };
   }, []);
   useEffect(() => {
     if (query.data && area === "refills")
@@ -379,6 +385,7 @@ function BackupDrawer({
       retry.current = { fingerprint, key: crypto.randomUUID() };
     setBusy(true);
     setError("");
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
     setNotice("");
     try {
       const result = await planningRequest({
@@ -388,7 +395,15 @@ function BackupDrawer({
       });
       retry.current = null;
       setNotice(result.message ?? "Planning updated.");
+      noticeTimer.current = setTimeout(() => {
+        setNotice("");
+        noticeTimer.current = null;
+      }, 4000);
       await Promise.allSettled([query.refetch(), refreshOverview(), updated()]);
+      if (action === "settings") {
+        setShowCriteria(false);
+        setArea("refills");
+      }
       return true;
     } catch (err) {
       setError(
@@ -401,7 +416,6 @@ function BackupDrawer({
       setBusy(false);
     }
   }
-  const selectedOrder = detail?.orders.find((o) => o.id === orderId);
   return (
     <dialog
       className="planning-drawer"
@@ -463,17 +477,26 @@ function BackupDrawer({
                 <div className="backup-section-heading">
                   <h3>HQ settings</h3>
                   <span className="backup-status unset">
-                    {row.source === "ai" ? "AI-assisted" : "Manual"}
+                    {manualNumbers
+                      ? "Manual"
+                      : row.source === "ai" ||
+                          (row.target === null && rec.eligible)
+                        ? "AI-assisted"
+                        : "Manual"}
                   </span>
                 </div>
                 <form
-                  className="backup-form"
+                  className="backup-form backup-settings-form"
                   key={`${row.target}:${row.threshold}:${row.unit}:${row.source}`}
                   onSubmit={(e) => {
                     e.preventDefault();
                     const values = new FormData(e.currentTarget);
-                    const target = Number(values.get("target")),
-                      threshold = Number(values.get("threshold"));
+                    const target = Number(
+                        targetDraft ??
+                          row.target ??
+                          (rec.eligible ? rec.quantity : 0),
+                      ),
+                      threshold = Number(thresholdDraft ?? row.threshold ?? 0);
                     if (threshold > target) {
                       setError(
                         "Alert threshold must be no greater than the target.",
@@ -484,7 +507,12 @@ function BackupDrawer({
                       target,
                       threshold,
                       unit: values.get("unit"),
-                      source: "manual",
+                      source: manualNumbers
+                        ? "manual"
+                        : row.source === "ai" ||
+                            (row.target === null && rec.eligible)
+                          ? "ai"
+                          : "manual",
                       reason: values.get("reason"),
                     });
                   }}
@@ -498,7 +526,15 @@ function BackupDrawer({
                       max={1000000}
                       step={1}
                       required
-                      defaultValue={row.target ?? 0}
+                      value={String(
+                        targetDraft ??
+                          row.target ??
+                          (rec.eligible ? rec.quantity : 0),
+                      )}
+                      onChange={(event) => {
+                        setManualNumbers(true);
+                        setTargetDraft(event.target.value);
+                      }}
                     />
                     <small>{row.unit}</small>
                   </label>
@@ -511,7 +547,11 @@ function BackupDrawer({
                       max={1000000}
                       step={1}
                       required
-                      defaultValue={row.threshold ?? 0}
+                      value={thresholdDraft ?? row.threshold ?? 0}
+                      onChange={(event) => {
+                        setManualNumbers(true);
+                        setThresholdDraft(event.target.value);
+                      }}
                     />
                     <small>
                       Alert when available stock is at or below this quantity.
@@ -542,509 +582,243 @@ function BackupDrawer({
                     Settings do not move retail stock or change physical stock
                     balances.
                   </p>
-                  <button className="button primary" disabled={busy}>
-                    Save settings
-                  </button>
+                  <div className="backup-settings-actions">
+                    <button className="button primary" disabled={busy}>
+                      Save settings
+                    </button>
+                    <button
+                      type="button"
+                      className="backup-criteria-button"
+                      aria-expanded={showCriteria}
+                      aria-controls="backup-criteria-popup"
+                      aria-label="Show AI suggestion criteria"
+                      onClick={() => setShowCriteria((value) => !value)}
+                    >
+                      <CircleHelp size={17} aria-hidden="true" />
+                    </button>
+                  </div>
+                  {showCriteria && (
+                    <div
+                      className="backup-criteria-popover"
+                      id="backup-criteria-popup"
+                      role="dialog"
+                      aria-label="AI suggestion criteria"
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") setShowCriteria(false);
+                      }}
+                    >
+                      <div className="backup-criteria-heading">
+                        <strong>AI suggestion criteria</strong>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          aria-label="Close AI suggestion criteria"
+                          onClick={() => setShowCriteria(false)}
+                        >
+                          <X size={17} aria-hidden="true" />
+                        </button>
+                      </div>
+                      <p>
+                        A suggested target appears after at least three complete
+                        observed months, five accepted emergency orders for this
+                        branch and shoe variant, and one completed backup
+                        refill. Retail sales are excluded.
+                      </p>
+                      <p>
+                        The target is the rounded-up monthly emergency-demand
+                        average plus demand variation and average daily demand
+                        during refill lead time. This is a planning estimate
+                        from recorded history, not a trained forecast.
+                      </p>
+                      <small>
+                        Evidence period: {rec.from} to {rec.to} (end excluded).{" "}
+                        {rec.orders} accepted orders · {rec.receipts} completed
+                        refills · {rec.completeMonths}/3 complete months.
+                      </small>
+                      {!rec.eligible && (
+                        <p>
+                          History does not meet the minimum yet. Set the target
+                          manually.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </form>
               </section>
             )}
-            <section
-              className="backup-drawer-section"
-              aria-labelledby="backup-ai-title"
-            >
-              <div className="backup-section-heading">
-                <h3 id="backup-ai-title">
-                  <Sparkles size={18} /> AI recommendation
-                </h3>
-                <span
-                  className={`backup-status ${rec.eligible ? "healthy" : "unset"}`}
-                >
-                  {rec.eligible ? "Evidence available" : "Insufficient history"}
-                </span>
-              </div>
-              {!rec.eligible ? (
-                <p className="backup-purpose">
-                  Insufficient history — continue with the HQ manual plan.
-                </p>
-              ) : (
-                <>
-                  <p className="backup-suggestion">
-                    <strong>
-                      {quantity(rec.quantity!)} {row.unit}
-                    </strong>
-                    <span>Suggested backup target</span>
-                  </p>
-                  <form
-                    className="backup-form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const values = new FormData(e.currentTarget);
-                      void mutate("settings", {
-                        target: rec.quantity,
-                        threshold: row.threshold ?? 0,
-                        unit: row.unit,
-                        source: "ai",
-                        reason: values.get("reason"),
-                      });
-                    }}
+            {area === "refills" && (
+              <>
+                <section className="backup-drawer-section" id="backup-refills">
+                  <button
+                    type="button"
+                    className="backup-back-button"
+                    onClick={() => setArea("settings")}
                   >
-                    <label className="field">
-                      Reason for applying recommendation
-                      <input
-                        name="reason"
-                        minLength={3}
-                        maxLength={500}
-                        required
-                      />
-                    </label>
-                    <button
-                      className="button secondary"
-                      disabled={busy || (row.threshold ?? 0) > rec.quantity!}
-                    >
-                      Apply recommended target
-                    </button>
-                    {(row.threshold ?? 0) > rec.quantity! && (
-                      <p>
-                        Lower the alert threshold in HQ settings before applying
-                        this target.
-                      </p>
-                    )}
-                  </form>
-                </>
-              )}
-              <p className="muted">
-                Evidence period: {rec.from} to {rec.to} (end excluded).
-              </p>
-              <dl className="backup-facts">
-                <div>
-                  <dt>Complete observed months</dt>
-                  <dd>{rec.completeMonths} / 3</dd>
-                </div>
-                <div>
-                  <dt>Accepted emergency orders</dt>
-                  <dd>{rec.orders} / 5 minimum</dd>
-                </div>
-                <div>
-                  <dt>Emergency demand</dt>
-                  <dd>
-                    {rec.units} {row.unit}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Completed backup refills</dt>
-                  <dd>{rec.receipts} / 1 minimum</dd>
-                </div>
-                {rec.eligible && (
-                  <>
+                    <ArrowLeft size={16} aria-hidden="true" /> Back to HQ
+                    settings
+                  </button>
+                  <h3>Refill details</h3>
+                  <dl className="backup-facts">
                     <div>
-                      <dt>Monthly demand variation</dt>
+                      <dt>Backup stock on hand</dt>
                       <dd>
-                        {rec.monthlyVariation} {row.unit}
+                        {row.available + row.reserved} {row.unit}
                       </dd>
                     </div>
                     <div>
-                      <dt>Average refill lead time</dt>
-                      <dd>{rec.leadDays} days</dd>
+                      <dt>Reserved for takeovers</dt>
+                      <dd>
+                        {row.reserved} {row.unit}
+                      </dd>
                     </div>
-                  </>
-                )}
-              </dl>
-              <details className="backup-limitations">
-                <summary>Method and limitations</summary>
-                <p>
-                  Minimum: three complete observed months, five accepted
-                  emergency orders for this branch/SKU, and one completed backup
-                  refill in the supporting period. Retail sales do not qualify.
-                </p>
-                <p>
-                  Target = rounded-up monthly emergency average + monthly
-                  standard deviation + average daily emergency demand × refill
-                  lead time. This is a statistical planning estimate, not a
-                  trained forecast or a confidence score. Cancelled orders and
-                  unaccepted demand are excluded; lost demand, returns, seasonal
-                  changes and unrecorded events can limit the estimate.
-                </p>
-              </details>
-            </section>
-            <section className="backup-drawer-section" id="backup-refills">
-              <h3>Refill details</h3>
-              <dl className="backup-facts">
-                <div>
-                  <dt>Backup stock on hand</dt>
-                  <dd>
-                    {row.available + row.reserved} {row.unit}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Reserved for takeovers</dt>
-                  <dd>
-                    {row.reserved} {row.unit}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Available backup</dt>
-                  <dd>
-                    {row.available} {row.unit}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Confirmed incoming</dt>
-                  <dd>
-                    {row.incoming} {row.unit}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Proposed refill</dt>
-                  <dd>
-                    {row.proposedRefill ?? "—"} {row.unit}
-                  </dd>
-                </div>
-              </dl>
-              <p className="backup-calculation">
-                Refill = max(0, target − (backup on hand − reservations) −
-                confirmed incoming). Only dispatched backup transfers with a
-                current, confirmed arrival date offset the proposal.
-              </p>
-              {row.openRefills > 0 ? (
-                <p className="backup-purpose">
-                  {row.openRefills} open backup{" "}
-                  {row.openRefills === 1 ? "refill" : "refills"}. Review the
-                  existing transfer before creating another.
-                </p>
-              ) : (
-                <form
-                  className="backup-form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const form = new FormData(e.currentTarget);
-                    void mutate("refill", { reason: form.get("reason") });
-                  }}
-                >
-                  <label className="field">
-                    Refill reason
-                    <input
-                      name="reason"
-                      required
-                      minLength={3}
-                      maxLength={500}
-                      placeholder="e.g. Restore the emergency backup target"
-                    />
-                  </label>
-                  <button
-                    className="button secondary"
-                    disabled={busy || !row.proposedRefill}
-                  >
-                    <PackagePlus size={17} /> Create refill ·{" "}
-                    {row.proposedRefill ?? 0} {row.unit}
-                  </button>
-                </form>
-              )}
-              <p className="muted">
-                In-transit stock becomes available only after the branch
-                confirms physical receipt.
-              </p>
-              {!detail?.transfers.length && (
-                <p className="muted">No backup refill transfers yet.</p>
-              )}
-              {detail?.transfers.map((t) => (
-                <article className="backup-history-card" key={t.id}>
-                  <div className="backup-section-heading">
-                    <strong>{t.reference}</strong>
-                    <span className="backup-status unset">
-                      {t.status === "shipping" ? "In transit" : t.status}
-                    </span>
-                  </div>
-                  <p>
-                    {t.quantity} {row.unit} · {date(t.createdAt)}
+                    <div>
+                      <dt>Available backup</dt>
+                      <dd>
+                        {row.available} {row.unit}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>In transit to branch</dt>
+                      <dd>
+                        {row.incoming} {row.unit}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Proposed refill</dt>
+                      <dd>
+                        {row.proposedRefill ?? "—"} {row.unit}
+                      </dd>
+                    </div>
+                  </dl>
+                  <p className="backup-calculation">
+                    Refill = max(0, target − (backup on hand − reservations) −
+                    in-transit backup). Dispatched backup stock counts as
+                    incoming until the branch confirms physical receipt.
                   </p>
-                  {t.status === "reserved" && (
+                  {row.openRefills > 0 ? (
+                    <p className="backup-purpose">
+                      {row.openRefills} open backup{" "}
+                      {row.openRefills === 1 ? "refill" : "refills"}. Review the
+                      existing transfer before creating another.
+                    </p>
+                  ) : (
                     <form
                       className="backup-form"
                       onSubmit={(e) => {
                         e.preventDefault();
-                        void mutate("dispatch_refill", {
-                          transferId: t.id,
-                          confirmed: true,
-                          reason: "HQ confirmed actual backup stock dispatch",
-                        });
-                      }}
-                    >
-                      <label className="backup-check">
-                        <input type="checkbox" required /> I confirm these goods
-                        have physically left HQ.
-                      </label>
-                      <button className="button secondary" disabled={busy}>
-                        Confirm dispatch
-                      </button>
-                    </form>
-                  )}
-                  {t.status === "shipping" && (
-                    <form
-                      className="backup-form"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const f = new FormData(e.currentTarget);
-                        void mutate("arrival", {
-                          transferId: t.id,
-                          due: f.get("due"),
-                          reason: "HQ confirmed backup refill arrival date",
-                        });
+                        const form = new FormData(e.currentTarget);
+                        void mutate("refill", { reason: form.get("reason") });
                       }}
                     >
                       <label className="field">
-                        Confirmed arrival date
-                        <input
-                          name="due"
-                          type="date"
-                          required
-                          defaultValue={t.due ?? ""}
-                        />
-                      </label>
-                      <button className="button secondary" disabled={busy}>
-                        Confirm arrival date
-                      </button>
-                    </form>
-                  )}
-                  {t.receivedAt && (
-                    <p>Receipt confirmed: {date(t.receivedAt)}</p>
-                  )}
-                </article>
-              ))}
-            </section>
-            <section className="backup-drawer-section">
-              <h3>Emergency fulfillment</h3>
-              <p>
-                Use backup only when HQ cannot meet the wholesale delivery
-                deadline. The branch must accept the request before stock is
-                reserved.
-              </p>
-              <button
-                className="button secondary"
-                disabled={busy}
-                onClick={() => setTakingOver(!takingOver)}
-              >
-                Record takeover
-              </button>
-              {takingOver &&
-                (!detail?.orders.length ? (
-                  <p className="backup-purpose">
-                    No eligible paid, reserved HQ order contains this SKU.
-                    Prepare the original wholesale order using the existing
-                    order workflow first.
-                  </p>
-                ) : (
-                  <form
-                    className="backup-form backup-takeover-form"
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      const f = new FormData(e.currentTarget);
-                      const success = await mutate("takeover", {
-                        orderId,
-                        deadline: new Date(
-                          `${String(f.get("deadline"))}+06:30`,
-                        ).toISOString(),
-                        reason: f.get("reason"),
-                        ...(selectedOrder?.dispatched
-                          ? {
-                              originalResolution: f.get("resolution"),
-                              consignmentResolved: true,
-                              receivedBack: f.get("receivedBack") === "on",
-                            }
-                          : {}),
-                      });
-                      if (success) setTakingOver(false);
-                    }}
-                  >
-                    <label className="field">
-                      Original wholesale order
-                      <select
-                        required
-                        value={orderId}
-                        onChange={(e) => setOrderId(e.target.value)}
-                      >
-                        <option value="">Choose an order</option>
-                        {detail.orders.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.reference} · {o.quantity} {row.unit} of this SKU
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {selectedOrder && (
-                      <p className="backup-purpose">
-                        The branch takes over the entire order:{" "}
-                        {selectedOrder.lines
-                          .map((l) => `${l.variant}: ${l.quantity}`)
-                          .join("; ")}
-                        . Every SKU must have sufficient backup at acceptance.
-                      </p>
-                    )}
-                    <label className="field">
-                      Original delivery deadline (Yangon local time)
-                      <input name="deadline" type="datetime-local" required />
-                    </label>
-                    <label className="field">
-                      Takeover reason / HQ delivery problem
-                      <textarea
-                        name="reason"
-                        required
-                        minLength={3}
-                        maxLength={500}
-                        placeholder="Explain why HQ cannot meet the deadline."
-                      />
-                    </label>
-                    {selectedOrder?.dispatched && (
-                      <>
-                        <label className="field">
-                          Original HQ consignment resolution
-                          <select name="resolution" required>
-                            <option value="">Choose a resolution</option>
-                            <option value="returned_to_hq">
-                              Returned to HQ
-                            </option>
-                            <option value="lost">Confirmed lost</option>
-                          </select>
-                        </label>
-                        <label className="backup-check">
-                          <input name="receivedBack" type="checkbox" /> If
-                          returned: all original goods were physically received
-                          back at HQ.
-                        </label>
-                        <label className="backup-check">
-                          <input type="checkbox" required /> I confirm the
-                          original consignment is reconciled and cannot also
-                          fulfill this order.
-                        </label>
-                      </>
-                    )}
-                    <button className="button primary" disabled={busy}>
-                      Request branch takeover
-                    </button>
-                  </form>
-                ))}
-            </section>
-            <section className="backup-drawer-section">
-              <h3>Takeover history</h3>
-              {!detail?.takeovers.length && (
-                <p className="muted">
-                  No emergency takeovers recorded for this branch/SKU.
-                </p>
-              )}
-              {detail?.takeovers.map((t) => (
-                <article className="backup-history-card" key={t.id}>
-                  <div className="backup-section-heading">
-                    <strong>{t.reference}</strong>
-                    <span className="backup-status unset">{t.status}</span>
-                  </div>
-                  <p>
-                    {t.quantity} {t.unit} · {t.actor} · {date(t.at)}
-                  </p>
-                  <p>{t.reason}</p>
-                  {openOrder && (
-                    <button
-                      className="backup-manage"
-                      disabled={busy}
-                      onClick={() => {
-                        close();
-                        void openOrder(t.orderId);
-                      }}
-                    >
-                      Manage original wholesale order
-                    </button>
-                  )}
-                  <p className="muted">
-                    Deadline: {date(t.deadline)}
-                    <br />
-                    Fulfilled:{" "}
-                    {t.fulfilledAt
-                      ? date(t.fulfilledAt)
-                      : "Awaiting confirmed receipt"}
-                  </p>
-                  <details>
-                    <summary>Audit trail</summary>
-                    <p>Original consignment: {t.resolution}</p>
-                    {t.responseReason && (
-                      <p>Branch / cancellation reason: {t.responseReason}</p>
-                    )}
-                    {t.events.map((event, i) => (
-                      <p key={i}>
-                        {event.action} · {event.actor} · {date(event.at)}
-                        {event.reason && ` · ${event.reason}`}
-                      </p>
-                    ))}
-                  </details>
-                  {t.status === "pending" && (
-                    <form
-                      className="backup-form"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const f = new FormData(e.currentTarget);
-                        void mutate("cancel_takeover", {
-                          orderId: t.orderId,
-                          handoffId: t.id,
-                          reason: f.get("reason"),
-                        });
-                      }}
-                    >
-                      <label className="field">
-                        Cancellation reason
+                        Refill reason
                         <input
                           name="reason"
                           required
                           minLength={3}
                           maxLength={500}
+                          placeholder="e.g. Restore the emergency backup target"
                         />
                       </label>
-                      <button className="button secondary" disabled={busy}>
-                        Cancel takeover request
+                      <button
+                        className="button secondary"
+                        disabled={busy || !row.proposedRefill}
+                      >
+                        <PackagePlus size={17} /> Create refill ·{" "}
+                        {row.proposedRefill ?? 0} {row.unit}
                       </button>
                     </form>
                   )}
-                </article>
-              ))}
-              <p className="muted">
-                Accepted takeovers reserve backup; dispatch deducts it once.
-                Cancellations before dispatch restore the reservation through
-                the existing order workflow. Dispatched stock requires
-                reconciliation, not an automatic stock reversal.
-              </p>
-            </section>
-            <section className="backup-drawer-section">
-              <button
-                className="backup-manage"
-                onClick={() => setAdvanced(!advanced)}
-                aria-expanded={advanced}
-              >
-                Advanced monthly versions and Groq explanations
-              </button>
-              {advanced && (
-                <div className="backup-advanced">
-                  <label className="field">
-                    Planning month
-                    <input
-                      type="month"
-                      value={month}
-                      onChange={(e) => setMonth(e.target.value)}
-                    />
-                  </label>
-                  {/^20\d\d-(0[1-9]|1[0-2])$/.test(month) && (
-                    <MonthlyPlanner
-                      branchId={row.branchId}
-                      month={`${month}-01`}
-                      viewer={viewer}
-                      demo={demo}
-                      updated={async () => {
-                        await Promise.all([
-                          refreshOverview(),
-                          query.refetch(),
-                          updated(),
-                        ]);
-                      }}
-                    />
+                  <p className="muted">
+                    In-transit stock becomes available only after the branch
+                    confirms physical receipt.
+                  </p>
+                  {!detail?.transfers.length && (
+                    <p className="muted">No backup refill transfers yet.</p>
                   )}
-                </div>
-              )}
-            </section>
+                  {detail?.transfers.map((t) => (
+                    <article className="backup-history-card" key={t.id}>
+                      <div className="backup-section-heading">
+                        <strong>{t.reference}</strong>
+                        <span className="backup-status unset">
+                          {t.status === "shipping" ? "In transit" : t.status}
+                        </span>
+                      </div>
+                      <p>
+                        {t.quantity} {row.unit} · {date(t.createdAt)}
+                      </p>
+                      {t.status === "reserved" && (
+                        <form
+                          className="backup-form"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            void mutate("dispatch_refill", {
+                              transferId: t.id,
+                              confirmed: true,
+                              reason:
+                                "HQ confirmed actual backup stock dispatch",
+                            });
+                          }}
+                        >
+                          <label className="backup-check">
+                            <input type="checkbox" required /> I confirm these
+                            goods have physically left HQ.
+                          </label>
+                          <button className="button secondary" disabled={busy}>
+                            Confirm dispatch
+                          </button>
+                        </form>
+                      )}
+                      {t.status === "shipping" && (
+                        <p className="muted">
+                          Waiting for the branch to confirm physical receipt.
+                        </p>
+                      )}
+                      {t.receivedAt && (
+                        <p>Receipt confirmed: {date(t.receivedAt)}</p>
+                      )}
+                    </article>
+                  ))}
+                </section>
+
+                <section className="backup-drawer-section">
+                  <button
+                    className="backup-manage"
+                    onClick={() => setAdvanced(!advanced)}
+                    aria-expanded={advanced}
+                  >
+                    Advanced monthly versions and Groq explanations
+                  </button>
+                  {advanced && (
+                    <div className="backup-advanced">
+                      <label className="field">
+                        Planning month
+                        <input
+                          type="month"
+                          value={month}
+                          onChange={(e) => setMonth(e.target.value)}
+                        />
+                      </label>
+                      {/^20\d\d-(0[1-9]|1[0-2])$/.test(month) && (
+                        <MonthlyPlanner
+                          branchId={row.branchId}
+                          month={`${month}-01`}
+                          viewer={viewer}
+                          demo={demo}
+                          updated={async () => {
+                            await Promise.all([
+                              refreshOverview(),
+                              query.refetch(),
+                              updated(),
+                            ]);
+                          }}
+                        />
+                      )}
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
           </>
         )}
       </div>

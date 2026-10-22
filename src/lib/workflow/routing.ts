@@ -87,12 +87,16 @@ export async function calculateRoadRoute(
         : "A planned route needs a dispatch location pin. After pickup, the route can start from the driver's GPS position.",
     };
   const mode = data.pickedUpAt ? "delivery" : "planned";
-  const destination = data.destination;
+  // The database already projects the permitted prefix for each customer.
+  // Never fetch a full group here and redact it after caching.
+  const stops = data.run?.stops.map((stop) => stop.pin) ?? [data.destination];
+  const destination = stops.at(-1) ?? data.destination;
   const key = JSON.stringify([
     data.orderId,
     data.attemptId,
     mode,
     destination,
+    stops,
     mode === "planned" ? origin : null,
   ]);
   const cached = routes.get(key);
@@ -125,7 +129,7 @@ export async function calculateRoadRoute(
   const promise = (async (): Promise<RouteResponse> => {
     try {
       const url = new URL(
-        `https://api.mapbox.com/directions/v5/mapbox/driving/${mapboxCoordinates(origin).join(",")};${mapboxCoordinates(destination).join(",")}`,
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${[origin, ...stops].map((pin) => mapboxCoordinates(pin).join(",")).join(";")}`,
       );
       url.search = new URLSearchParams({
         access_token: token,

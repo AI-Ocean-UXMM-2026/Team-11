@@ -186,3 +186,41 @@ it("clears the GPS watch when handover ends the active attempt or the driver sig
   expect(clear.mock.calls.length).toBeGreaterThan(count);
   expect(host.querySelector("span")?.textContent).toBe("");
 });
+
+it("continues GPS for the next picked-up group stop after the current handover", async () => {
+  await render();
+  await click("Pickup confirmed");
+  const next = {
+    orderId: "next-order",
+    attemptId: "next-attempt",
+    reference: "STT-next",
+  };
+  const active = { ...snapshot, ...next };
+  snapshot = {
+    ...snapshot,
+    state: "stopped",
+    canPublish: false,
+    run: { stops: [], publisher: next },
+  };
+  transport.read.mockImplementation(async (id) =>
+    id === "next-order" ? active : snapshot,
+  );
+  transport.send.mockImplementation(async (id, update) => ({
+    ...(id === "next-order" ? active : snapshot),
+    state: update.state,
+  }));
+  await act(async () => transport.changed());
+  expect(host.querySelector("span")?.textContent).toBe("next-order");
+  expect(watch.mock.calls.length).toBeGreaterThan(1);
+  await act(async () =>
+    success({
+      timestamp: Date.now(),
+      coords: { latitude: 16.84, longitude: 96.17, accuracy: 9 },
+    } as GeolocationPosition),
+  );
+  expect(
+    transport.send.mock.calls.some(
+      ([id, update]) => id === "next-order" && update.state === "sharing",
+    ),
+  ).toBe(true);
+});

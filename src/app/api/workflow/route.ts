@@ -6,6 +6,8 @@ import {
   parseWorkspaceQuery,
 } from "@/lib/workflow/server";
 const actions = new Set([
+  "phase_request",
+  "phase_cancel",
   "backup_configure",
   "branch_create",
   "branch_update",

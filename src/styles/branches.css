@@ -17,6 +17,15 @@
   font-size: 13px;
   margin-bottom: 0;
 }
+.driver-branch-filter {
+  flex: 0 1 260px;
+  min-width: 190px;
+  margin: 0;
+}
+.driver-branch-filter select {
+  min-height: 42px;
+  width: 100%;
+}
 .driver-management .button {
   min-height: 44px;
 }

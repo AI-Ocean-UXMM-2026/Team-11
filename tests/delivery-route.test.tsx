@@ -13,6 +13,7 @@ vi.mock("../src/components/location-map", () => ({
       data-route={JSON.stringify(p.route)}
       data-remaining={JSON.stringify(p.remainingRoute)}
       data-navigation={String(p.navigation)}
+      data-markers={JSON.stringify(p.markers)}
     />
   ),
 }));
@@ -126,6 +127,31 @@ it("labels stale GPS estimates and hides live arrival/follow controls for HQ and
       .querySelector('[data-testid="road-map"]')
       ?.getAttribute("data-navigation"),
   ).toBe("false");
+});
+it("labels preceding customer stops anonymously and shows the customer's own numbered destination", async () => {
+  data.run = {
+    stops: [
+      { position: 1, own: false, pin: { latitude: 16.81, longitude: 96.115 } },
+      { position: 2, own: true, pin: data.destination! },
+    ],
+  };
+  await render(true, "sme");
+  expect(host.textContent).toContain("Earlier delivery stop");
+  expect(host.textContent).toContain("Your delivery");
+  expect(host.textContent).toContain("delivery details are private");
+  const markers = JSON.parse(
+    host
+      .querySelector('[data-testid="road-map"]')!
+      .getAttribute("data-markers")!,
+  );
+  expect(markers.find((marker: any) => marker.id === "stop-1")).toMatchObject({
+    number: 1,
+    label: "Stop 1: earlier delivery stop",
+  });
+  expect(markers.find((marker: any) => marker.id === "stop-2")).toMatchObject({
+    number: 2,
+    color: "#17674f",
+  });
 });
 it("shows planned source routing before pickup, and does not request a route without a source or destination", async () => {
   data = { ...data, pickedUpAt: null, point: null };

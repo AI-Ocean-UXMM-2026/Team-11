@@ -150,7 +150,7 @@ it("requires assigned-driver pickup after dispatch and records a retry only once
     "assigned driver",
   );
   await expect(action("outsider", "pickup", orderId)).rejects.toThrow(
-    "assigned driver",
+    "unavailable",
   );
   await expect(action("driver", "handover", orderId)).rejects.toThrow(
     "Confirm pickup",

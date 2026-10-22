@@ -20,14 +20,23 @@ function assignedLocation(driver: Account, data: WorkspaceData) {
 
 export function DriverManagement({ data, updated }: Props) {
   const [search, setSearch] = useState("");
+  const [branchFilter, setBranchFilter] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const drivers = data.accounts.filter((account) => account.role === "driver");
   const selected = drivers.find((driver) => driver.id === selectedId);
-  const matches = drivers.filter((driver) =>
-    `${driver.name} ${driver.username} ${assignedLocation(driver, data)}`
-      .toLowerCase()
-      .includes(search.trim().toLowerCase()),
-  );
+  const matches = drivers.filter((driver) => {
+    const matchesBranch =
+      !branchFilter ||
+      (branchFilter === "__hq__"
+        ? !driver.branchId
+        : driver.branchId === branchFilter);
+    return (
+      matchesBranch &&
+      `${driver.name} ${driver.username} ${assignedLocation(driver, data)}`
+        .toLowerCase()
+        .includes(search.trim().toLowerCase())
+    );
+  });
 
   return (
     <div className="driver-management">
@@ -35,7 +44,7 @@ export function DriverManagement({ data, updated }: Props) {
         <div className="panel-heading">
           <h2>Driver directory</h2>
           <span className="count-chip">
-            {drivers.length} {drivers.length === 1 ? "driver" : "drivers"}
+            {matches.length} {matches.length === 1 ? "driver" : "drivers"}
           </span>
         </div>
         <div className="filter-bar">
@@ -47,6 +56,23 @@ export function DriverManagement({ data, updated }: Props) {
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search name, account ID or branch…"
             />
+          </label>
+          <label className="field driver-branch-filter">
+            Branch
+            <select
+              value={branchFilter}
+              onChange={(event) => setBranchFilter(event.target.value)}
+              aria-label="Filter drivers by branch"
+            >
+              <option value="">All branches</option>
+              <option value="__hq__">STT Yangon HQ</option>
+              {data.branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                  {branch.active === false ? " (closed)" : ""}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         {drivers.length ? (
@@ -90,7 +116,7 @@ export function DriverManagement({ data, updated }: Props) {
                 ))}
                 {!matches.length && (
                   <tr>
-                    <td colSpan={5}>No drivers match your search.</td>
+                    <td colSpan={5}>No drivers match these filters.</td>
                   </tr>
                 )}
               </tbody>

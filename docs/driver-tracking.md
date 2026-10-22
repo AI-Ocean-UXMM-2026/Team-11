@@ -6,6 +6,12 @@ start delivery**. Pickup is a separate, recorded delivery event. Location sharin
 begins in that browser after pickup succeeds and the driver grants GPS permission.
 GPS permission failure does not roll back pickup or block manual handover.
 
+For grouped deliveries, the driver first uses **Accept delivery group**, checks
+the physically collected parcels, then selects **Confirm pickup & start route**.
+Acceptance alone never starts GPS. One foreground publisher shares fixes only
+for collected group members; handover remains separate for every stop. See
+[group acceptance and pickup](grouped-deliveries.md#driver-acceptance-and-parcel-pickup).
+
 Keep Supply Link open on an HTTPS page (localhost is allowed during development).
 The driver can close the order dialog or navigate within the driver portal while
 sharing. The portal displays a persistent location-sharing notice with pause and
@@ -42,7 +48,10 @@ seconds; a disconnected live subscription also prevents a “live” label. Ther
 are no arrival-based status changes or guaranteed ETA estimates. Road routing,
 estimated travel time and the focused driver view are described in
 [live routing](live-routing.md).
-Driver handover, SME receipt and HQ completion retain their separate meanings.
+Driver handover and SME receipt remain separate confirmations. Both are required
+for completion; HQ no longer confirms completion. For [phased fulfilment](phased-fulfilment.md),
+each phase needs both confirmations and the order finishes only after every pair
+has been delivered.
 
 The driver order dialog contains order details and delivery actions, with an
 **Open delivery view** link instead of an embedded Delivery location section.

@@ -1,0 +1,187 @@
+.branch-movements {
+  min-width: 0;
+}
+.branch-movement-panel {
+  overflow: hidden;
+}
+.branch-movement-heading,
+.branch-movement-record-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 26px 20px;
+}
+.branch-movement-heading h2,
+.branch-movement-record-heading h3,
+.branch-movement-intro h3 {
+  margin: 0;
+  color: var(--ink);
+}
+.branch-movement-heading p,
+.branch-movement-record-heading p,
+.branch-movement-intro p {
+  margin: 5px 0 0;
+  color: var(--muted);
+}
+.branch-movement-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 26px;
+  border-bottom: 1px solid var(--border);
+}
+.branch-movement-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 14px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  font-weight: 700;
+}
+.branch-movement-tabs button.selected {
+  color: var(--forest);
+  border-bottom-color: var(--green);
+}
+.branch-movement-form,
+.branch-movement-records {
+  padding: 24px 26px 26px;
+}
+.branch-movement-intro {
+  margin-bottom: 20px;
+}
+.branch-movement-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.branch-movement-reason {
+  grid-column: 1 / -1;
+}
+.branch-movement-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fbfcfa;
+}
+.branch-movement-preview > div {
+  display: grid;
+  gap: 3px;
+  padding: 15px 17px;
+}
+.branch-movement-preview > div + div {
+  border-left: 1px solid var(--border);
+}
+.branch-movement-preview span,
+.branch-movement-pool-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+.branch-movement-preview strong {
+  color: var(--forest);
+  font-size: 16px;
+}
+.branch-movement-pool-note {
+  margin: 15px 0;
+}
+.branch-movement-submit {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+.branch-movement-record-heading {
+  padding: 0 0 20px;
+}
+.branch-movement-own-branch strong {
+  min-height: 43px;
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #f7f9f5;
+  color: var(--forest);
+  font-size: 13px;
+}
+.branch-movement-branch-label {
+  align-self: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--forest);
+  font-size: 12px;
+  font-weight: 700;
+}
+.branch-movement-records .table-scroll {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.movement-in {
+  color: var(--green);
+  white-space: nowrap;
+}
+.movement-out {
+  color: #a54d38;
+  white-space: nowrap;
+}
+.branch-movement-pagination,
+.branch-movement-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.branch-movement-pagination {
+  justify-content: space-between;
+  padding-top: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.branch-movement-pagination .button {
+  min-height: 35px;
+  padding: 7px 12px;
+}
+.branch-movement-empty {
+  display: grid;
+  justify-items: center;
+  padding: 42px 20px;
+  color: var(--muted);
+  text-align: center;
+}
+.branch-movement-empty h3 {
+  margin: 10px 0 0;
+  color: var(--ink);
+}
+.branch-movement-empty p {
+  margin: 4px 0 0;
+}
+.form-success {
+  padding: 12px;
+  margin: 0;
+  color: var(--forest);
+  background: var(--mint);
+  border: 1px solid #c8dbc3;
+  border-radius: 5px;
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .branch-movement-heading,
+  .branch-movement-record-heading {
+    flex-direction: column;
+  }
+  .branch-movement-fields,
+  .branch-movement-preview {
+    grid-template-columns: 1fr;
+  }
+  .branch-movement-preview > div + div {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+  .branch-movement-pagination,
+  .branch-movement-pagination > div {
+    flex-wrap: wrap;
+  }
+}

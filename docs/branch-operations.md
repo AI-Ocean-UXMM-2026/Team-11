@@ -1,5 +1,17 @@
 # Branch operations
 
+## Branch product availability
+
+Branch staff open **Branch stock** (`/branch/inventory`) to see their own branch's
+products first, above incoming transfers. Each color/size has a photo and counts
+for available pairs, retail, wholesale backup, allocated deliveries and on-hand
+stock. Available means on-hand minus allocated; retail additionally excludes the
+wholesale backup pool. Incoming refills count only after receipt confirmation.
+Search filters product name, color and size. Summary totals remain branch-wide.
+**Refresh stock** reloads the existing authenticated workspace query; focus and
+reconnection refresh behaviour is unchanged. This view uses the existing scoped
+stock RPC data and needs no database migration.
+
 ## Retail and wholesale backup pools
 
 HQ supplies wholesale orders. Branches operate retail shops and hold a separate emergency wholesale reserve. A takeover can reserve only protected backup pairs for every ordered size/color; plenty of retail stock does not make an insufficient backup reserve eligible. Accepted takeover events and shortage declines feed the monthly backup planning history. Cancelling or replacing an undispatched branch order restores its committed pairs to backup. Dispatch reduces committed backup stock and physical on-hand stock while leaving retail availability unchanged.
@@ -76,7 +88,14 @@ For refills the source is HQ and the branch receives. For returns the branch dis
 
 ## Hand an order to a branch
 
-HQ requests fulfilment by an open branch for a paid, reserved order. The selected branch accepts only when it can reserve the entire order, or declines with a reason. Acceptance switches fulfilment to that branch. Its staff assign an affiliated driver, prepare and dispatch. Driver handover, SME receipt and HQ completion retain the existing single-sale workflow.
+HQ requests fulfilment by an open branch for a paid, reserved order. The new
+[phase planner](phased-fulfilment.md) can request only available quantities (for
+example 40 of 60 pairs), leaving the remainder reserved at HQ. The selected branch
+accepts that phase, assigns its driver, prepares and dispatches only those pairs.
+Driver handover and SME receipt confirm each phase. The overall order stays
+**Order remaining** during later deliveries and becomes **Done** once every pair
+has both confirmations, with one sale and no HQ completion step. Existing full
+consignment replacements remain separate from phased fulfilment.
 
 If the original shipment was already dispatched, place the delivery on hold and explicitly reconcile the original consignment as physically returned to HQ or lost before requesting a replacement. Returned goods are restored once; lost goods are not restored. A pending or unresolved replacement blocks normal delivery resumption. Declining or cancelling the request does not silently resume a reconciled shipment.
 

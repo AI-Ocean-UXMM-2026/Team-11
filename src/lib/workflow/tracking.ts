@@ -69,7 +69,8 @@ export async function publishLocation(
         409,
       );
     }
-    notifyDemoTracking(orderId);
+    // A fix may update several authorized stops in one delivery group.
+    notifyDemoTracking();
   } else {
     const { error } = await (
       await createClient()

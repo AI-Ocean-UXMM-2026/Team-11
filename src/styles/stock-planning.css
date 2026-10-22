@@ -191,6 +191,131 @@
   display: flex;
   flex-direction: column;
 }
+.backup-settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.backup-settings-actions > .button.primary {
+  flex: 1;
+}
+.backup-settings-form {
+  position: relative;
+}
+.backup-criteria-button {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #fff;
+  cursor: pointer;
+}
+.backup-criteria-button:hover,
+.backup-criteria-button:focus-visible {
+  color: var(--green);
+  border-color: var(--green);
+}
+.backup-criteria-popover {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  bottom: 54px;
+  width: min(430px, 100%);
+  max-height: min(55vh, 420px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 12px 36px #18332626;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.backup-criteria-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.backup-criteria-heading .icon-button {
+  min-width: 32px;
+  min-height: 32px;
+}
+.backup-criteria-popover p {
+  margin: 8px 0;
+}
+.backup-criteria-popover small {
+  display: block;
+  color: var(--muted);
+}
+.backup-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  margin: -8px 0 18px;
+  padding: 6px 0;
+  border: 0;
+  color: var(--green);
+  background: transparent;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.backup-back-button:hover {
+  text-decoration: underline;
+}
+.takeover-report .panel-heading > div > p {
+  margin: 5px 0 0;
+}
+.takeover-report-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.takeover-report-footer > div {
+  display: flex;
+  gap: 8px;
+}
+.takeover-report-audit {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.takeover-report-audit summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.takeover-report-audit article {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.takeover-report-audit article p {
+  margin: 5px 0;
+}
+.takeover-report-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 36px 16px;
+  color: var(--muted);
+  text-align: center;
+}
+.takeover-report-empty strong {
+  color: var(--ink);
+}
 .planning-drawer::backdrop {
   background: #1c302e59;
 }

@@ -165,17 +165,17 @@ if(branchMode){
 const stopped=await request('sme',`/api/orders/${orderId}/tracking`);
 assert.equal(stopped.data.canPublish,false);
 assert.equal(stopped.data.point,null);
-await act("sme", "receive", { orderId, fullReceipt: true });
 const before = await request("hq", "/api/workflow");
 assert.ok(!before.data.salesEvents.some((e) => e.orderId === orderId));
-const final = await act("hq", "complete", { orderId });
+await act("sme", "receive", { orderId, fullReceipt: true });
+const final = await request("hq", "/api/workflow");
 assert.equal(final.data.orders.find((o) => o.id === orderId).status, "Done");
 assert.equal(
   final.data.salesEvents.filter((e) => e.orderId === orderId).length,
   1,
 );
 console.log(
-  `PASS ${order.reference}: quote → private proof → verify/reserve → assign → dispatch (retry safe) → pickup → GPS/SSE → handover → SME receipt → HQ completion → one sale`,
+  `PASS ${order.reference}: quote → private proof → verify/reserve → assign → dispatch (retry safe) → pickup → GPS/SSE → handover → SME receipt → Done → one sale`,
 );
 console.log(
   "PASS anonymous and driver proof access denied; driver monetary data withheld"+(branchMode?"; branch refill, backup and affiliated driver verified":""),

@@ -42,9 +42,12 @@ For example, 80 target with 16 available and no incoming needs 64 additional uni
 
 ## Emergency takeover and audit history
 
-**Record takeover** selects an existing paid, reserved wholesale order originating at HQ. The selected SKU must belong to the order. HQ records the original delivery deadline and explains the HQ delivery problem. Deadlines entered in the drawer are interpreted as Yangon local time. The entire original order is requested, not a partial basket: every SKU must have sufficient backup when the branch accepts.
-
-The request uses the existing handoff workflow. It does not deduct stock at creation. The selected branch accepts and reserves dedicated backup, then assigns its branch driver, prepares and dispatches through its existing delivery workflow. Retail stock cannot cover a backup shortfall. After an HQ consignment has already dispatched, HQ must reconcile it as lost or physically returned before requesting replacement. Old attempts are replaced and cannot also complete the original order.
+Arrange branch fulfilment through **Wholesale orders → open an order → Order management**.
+The duplicate **Emergency fulfillment / Record takeover** form has been removed
+from Stock Planning. Use the order's phased fulfilment controls to select a branch
+and quantities; [phased fulfilment](phased-fulfilment.md) describes partial
+branch deliveries and later delivery of outstanding pairs. Stock Planning retains
+backup settings, refills and takeover audit history.
 
 History links the original order and records branch, SKU quantity/unit snapshots, reason, original consignment resolution, deadline, requesting user/time, response/cancellation reason and order events. Fulfillment time comes from the recipient's existing confirmed receipt; unconfirmed deliveries are not marked fulfilled. Legacy missing deadlines are labelled **Not recorded**. The drawer shows recent requests/transfers; complete records remain in the existing database audit tables.
 

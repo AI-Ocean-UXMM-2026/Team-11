@@ -119,7 +119,12 @@ export function DeliveryTracking({
   const live = connected && locationIsFresh(data, now);
   const canResume =
     viewer.role === "driver" && data.canPublish && !!data.attemptId;
-  const active = publisher.trip?.attemptId === data.attemptId;
+  const active =
+    publisher.trip?.attemptId === data.attemptId ||
+    !!(
+      publisher.trip &&
+      data.run?.stops.some((stop) => stop.orderId === publisher.trip?.orderId)
+    );
   const status =
     data.state === "stopped"
       ? "Location sharing ended"
@@ -183,6 +188,12 @@ export function DeliveryTracking({
             </span>
           )}
           {data.destination && <span>Green: destination</span>}
+          {data.run?.stops.some((stop) => !stop.own) && (
+            <span>
+              Amber:{" "}
+              {viewer.role === "sme" ? "earlier stops" : "other drop-offs"}
+            </span>
+          )}
           {data.source.pin && <span>Grey: dispatch source</span>}
         </p>
       )}

@@ -107,6 +107,14 @@ export function SmeOrdersTable({
                     <span className="status-dot" />
                     {order.status}
                   </span>
+                  {order.workflow?.fulfilment?.current && (
+                    <small>
+                      Phase {order.workflow.fulfilment.current.number} ·{" "}
+                      {order.workflow.fulfilment.current.state === "requested"
+                        ? "Awaiting branch acceptance"
+                        : order.workflow.fulfilment.deliveryStatus}
+                    </small>
+                  )}
                 </td>
                 <td>
                   <PaymentStatus order={order} />

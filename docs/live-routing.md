@@ -14,6 +14,8 @@ orders beyond the first list page. Closing the restored popup removes the return
 selection from the URL. Navigation does not stop active GPS sharing.
 HQ and the ordering SME see road routing in their order details. Branch staff
 and unrelated accounts cannot read it.
+For multi-stop assignment and customer-specific anonymous route prefixes, see
+[grouped deliveries](grouped-deliveries.md).
 
 ## Origins and lifecycle
 

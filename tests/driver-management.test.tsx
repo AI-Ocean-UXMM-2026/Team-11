@@ -111,14 +111,29 @@ it("lists only drivers with their current affiliation and initializes editing to
   expect(host.textContent).toContain("Hlaing branch");
   expect(host.textContent).not.toContain("Private SME");
   await click("Manage affiliation for Branch Driver");
-  expect(host.querySelector<HTMLSelectElement>("select")!.value).toBe(
-    "branch-open",
-  );
   expect(
-    [...host.querySelectorAll("option")].some(
-      (option) => option.value === "branch-closed",
-    ),
+    host.querySelector<HTMLSelectElement>('select[name="branchId"]')!.value,
+  ).toBe("branch-open");
+  expect(
+    [
+      ...host.querySelectorAll<HTMLOptionElement>(
+        'select[name="branchId"] option',
+      ),
+    ].some((option) => option.value === "branch-closed"),
   ).toBe(false);
+});
+
+it("filters the driver directory by branch", async () => {
+  const filter = host.querySelector<HTMLSelectElement>(
+    'select[aria-label="Filter drivers by branch"]',
+  )!;
+  await act(async () => {
+    filter.value = "branch-open";
+    filter.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(host.textContent).toContain("Branch Driver");
+  expect(host.textContent).toContain("Hlaing branch");
+  expect(host.textContent).not.toContain("HQ Driver");
 });
 
 it("saves an HQ driver’s branch affiliation and refreshes the workspace", async () => {

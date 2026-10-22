@@ -11,6 +11,7 @@ export const roleNames: Record<Role, string> = {
   driver: "Driver portal",
 };
 export type OrderStatus =
+  | "Order remaining"
   | "Draft"
   | "Awaiting verification"
   | "Confirmed"
@@ -35,6 +36,45 @@ export interface Order {
   salesDate?: string;
   source: string;
   workflow?: {
+    fulfilment?: {
+      deliveryStatus: OrderStatus;
+      ordered: number;
+      received: number;
+      remaining: number;
+      current: {
+        id: string;
+        number: number;
+        state: "requested" | "reserved" | "dispatched";
+        sourceBranchId: string | null;
+        source: string;
+        pairs: number;
+        received: boolean;
+        attemptId: string | null;
+        lines: {
+          productId: string;
+          name: string;
+          variant: string;
+          quantity: number;
+        }[];
+      } | null;
+      history: {
+        id: string;
+        number: number;
+        source: string;
+        state: string;
+        pairs: number;
+        received: boolean;
+        handover: boolean;
+        completedAt: string | null;
+      }[];
+      lines: {
+        productId: string;
+        name: string;
+        variant: string;
+        ordered: number;
+        received: number;
+      }[];
+    } | null;
     receiver: string;
     phone: string;
     notes: string;
@@ -261,8 +301,7 @@ export function businessDate(timestamp: string) {
     day: "2-digit",
   }).format(new Date(timestamp));
 }
-export function money(amount: number, compact = false) {
-  if (compact && amount >= 1000000) return `${(amount / 1000000).toFixed(2)}M`;
+export function money(amount: number) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
     amount,
   );
@@ -323,6 +362,7 @@ export function canAccess(role: Role, section: string) {
     branch: [
       "overview",
       "inventory",
+      "stock-movements",
       "sales",
       "reports",
       "settings",

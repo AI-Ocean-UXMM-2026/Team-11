@@ -3,6 +3,7 @@ import {
   planningRpc,
   explainStockPlan,
   explanationConfiguration,
+  takeoverReportPage,
 } from "@/lib/workflow/stock-planning";
 import { workflowActor, WorkflowError } from "@/lib/workflow/server";
 import { samePortalOrigin } from "@/lib/workflow/origin";
@@ -24,6 +25,13 @@ export async function GET(request: Request) {
   try {
     const actor = await workflowActor();
     const params = new URL(request.url).searchParams;
+    if (params.get("view") === "takeovers") {
+      const page = z.coerce.number().int().min(1).max(1000000).default(1).parse(params.get("page"));
+      return Response.json(
+        { data: await takeoverReportPage(actor, page) },
+        { headers },
+      );
+    }
     if (params.get("view") === "overview" || params.get("view") === "detail") {
       const action = params.get("view")!;
       const payload =

@@ -173,6 +173,31 @@ export interface BackupPlanningDetail {
     lines: { variant: string; quantity: number }[];
   }[];
 }
+export interface TakeoverReportRow {
+  id: string;
+  orderId: string;
+  reference: string;
+  branchName: string;
+  productId: string;
+  variant: string;
+  quantity: number;
+  unit: string;
+  reason: string;
+  resolution: string;
+  responseReason: string | null;
+  deadline: string | null;
+  fulfilledAt: string | null;
+  status: string;
+  actor: string;
+  at: string;
+  events: { action: string; reason: string; at: string; actor: string }[];
+}
+export interface TakeoverReportPage {
+  rows: TakeoverReportRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
 export interface PlanningRow {
   configuredTarget?: number | null;
   productId: string;

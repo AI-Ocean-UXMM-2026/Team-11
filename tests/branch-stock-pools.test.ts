@@ -241,11 +241,7 @@ it("creates one backup refill despite different retry keys and adds it only afte
     transferId: first.transferId,
     confirmed: true,
   });
-  expect((await detail(b)).row).toMatchObject({ available: 16, incoming: 0 });
-  await planAction("arrival", b, {
-    transferId: first.transferId,
-    due: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Yangon" }),
-  });
+  expect((await detail(b)).row).toMatchObject({ available: 16, incoming: 64 });
   expect((await detail(b)).row).toMatchObject({
     available: 16,
     incoming: 64,
@@ -407,6 +403,27 @@ it("requires observed emergency history and backup lead time; applying a support
       (r) => r.branchId === b && r.productId === product,
     )?.source,
   ).toBe("ai");
+});
+it("limits branch physical stock records to stock additions already received", async () => {
+  const b = await branch();
+  await db.query(
+    "insert into public.inventory_movements(product_id,branch_id,actor_id,kind,quantity,reason) values($1,$2,$3,'transfer_in',12,'HQ transfer received'),($1,$2,$3,'physical_in_backup',4,'Backup received'),($1,$2,$3,'retail',-2,'Retail sale'),($1,$2,$3,'transfer_out',-3,'Transfer sent')",
+    [product, b, users.branch],
+  );
+  const history = await query<any>(
+    "branch",
+    "select public.branch_stock_movement_history($1::uuid,1,25) r",
+    [b],
+  );
+  expect(history.total).toBe(2);
+  expect(history.rows.map((row: { kind: string }) => row.kind).sort()).toEqual([
+    "physical_in_backup",
+    "transfer_in",
+  ]);
+  const permission = await db.query<{ allowed: boolean }>(
+    "select has_function_privilege('authenticated','public.record_branch_stock_movement(uuid,uuid,text,text,integer,text,uuid)','execute') allowed",
+  );
+  expect(permission.rows[0].allowed).toBe(false);
 });
 async function branch(backup = 16) {
   const id = randomUUID();
@@ -753,7 +770,9 @@ it("counts only explicitly labelled backup transfers in backup planning and back
     reason: "Initial target",
   });
   const month = new Date().toISOString().slice(0, 7) + "-01",
-    due = new Date().toISOString().slice(0, 10);
+    due = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Yangon",
+    }).format(new Date());
   for (const purpose of ["retail", "backup"]) {
     const t = await run("hq", "transfer_create", {
       destinationBranchId: b,

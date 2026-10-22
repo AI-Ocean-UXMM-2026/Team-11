@@ -8,10 +8,12 @@ export function LocationPicker({
   required = false,
   initialPin,
   label = "Location pin",
+  onChange,
 }: {
   required?: boolean;
   initialPin?: LocationPin;
   label?: string;
+  onChange?: (pin: LocationPin) => void;
 }) {
   const [pin, setPin] = useState<LocationPin | undefined>(initialPin);
   const [message, setMessage] = useState("");
@@ -19,6 +21,7 @@ export function LocationPicker({
   function select(next: LocationPin) {
     setPin(next);
     setMessage("");
+    onChange?.(next);
   }
   function locate() {
     if (!navigator.geolocation) {

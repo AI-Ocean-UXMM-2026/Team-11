@@ -34,6 +34,23 @@ export interface DeliveryTracking {
     capturedAt: string;
     receivedAt: string;
   } | null;
+  run?: {
+    stops: {
+      position: number;
+      own: boolean;
+      pin: { latitude: number; longitude: number };
+      // Supplied only to HQ and the assigned driver, never another customer.
+      orderId?: string;
+      reference?: string;
+      business?: string;
+      status?: string;
+    }[];
+    publisher?: {
+      orderId: string;
+      attemptId: string;
+      reference: string;
+    } | null;
+  };
 }
 
 export const LOCATION_CADENCE_MS = 10_000;

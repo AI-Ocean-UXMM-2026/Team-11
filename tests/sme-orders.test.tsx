@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SmeOrdersTable } from "../src/components/sme-orders-table";
 import { OrderWorkflow } from "../src/components/order-workflow";
@@ -19,6 +20,7 @@ vi.mock("../src/components/payment-destinations", () => ({
   PaymentDestinations: () => <p>Receiving account details</p>,
 }));
 let root: Root, host: HTMLDivElement, order: Order;
+let client: QueryClient;
 const openOrder = vi.fn();
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -31,6 +33,7 @@ beforeEach(() => {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   openOrder.mockClear();
   action.mockReset();
   order = {
@@ -95,6 +98,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await act(async () => root.unmount());
+  client.clear();
   host.remove();
   Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
   vi.restoreAllMocks();
@@ -109,15 +113,17 @@ async function table() {
 async function workflow(role: Role, branchId?: string) {
   await act(async () =>
     root.render(
-      <OrderWorkflow
-        order={order}
-        viewer={{ id: role, name: role, role, branchId }}
-        accounts={[]}
-        branches={[]}
-        updated={vi.fn()}
-        refresh={vi.fn()}
-        demo
-      />,
+      <QueryClientProvider client={client}>
+        <OrderWorkflow
+          order={order}
+          viewer={{ id: role, name: role, role, branchId }}
+          accounts={[]}
+          branches={[]}
+          updated={vi.fn()}
+          refresh={vi.fn()}
+          demo
+        />
+      </QueryClientProvider>,
     ),
   );
 }
@@ -309,7 +315,13 @@ function ReceiptDialog() {
 }
 
 async function confirmReceipt() {
-  await act(async () => root.render(<ReceiptDialog />));
+  await act(async () =>
+    root.render(
+      <QueryClientProvider client={client}>
+        <ReceiptDialog />
+      </QueryClientProvider>,
+    ),
+  );
   const checkbox = host.querySelector<HTMLInputElement>(
     'input[type="checkbox"]',
   )!;
@@ -321,8 +333,8 @@ async function confirmReceipt() {
 }
 
 it.each([false, true])(
-  "closes the receipt dialog and reports success only after confirmation (HQ complete: %s)",
-  async (hqComplete) => {
+  "closes the receipt dialog and reports success only after confirmation (driver handover: %s)",
+  async (driverHandover) => {
     let resolve!: (value: unknown) => void;
     action.mockReturnValue(
       new Promise((done) => {
@@ -340,8 +352,13 @@ it.each([false, true])(
     );
     const received = {
       ...order,
-      status: hqComplete ? "Done" : "Shipping",
-      workflow: { ...order.workflow!, received: true, hqComplete },
+      status: driverHandover ? "Done" : "Shipping",
+      workflow: {
+        ...order.workflow!,
+        received: true,
+        handover: driverHandover,
+        hqComplete: false,
+      },
     };
     await act(async () =>
       resolve({
@@ -353,7 +370,7 @@ it.each([false, true])(
     const success = host.querySelector('[role="status"]')?.textContent;
     expect(success).toContain(`Full receipt confirmed for ${order.reference}`);
     expect(success).toContain(
-      hqComplete ? "Your order is complete." : "Awaiting HQ completion.",
+      driverHandover ? "Your order is complete." : "Awaiting driver handover.",
     );
   },
 );

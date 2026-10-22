@@ -15,4 +15,8 @@ export function subscribeDemoTracking(orderId: string, changed: () => void) {
 export function notifyDemoTracking(orderId?: string) {
   if (orderId)
     runtime.deliveryListeners?.get(orderId)?.forEach((changed) => changed());
+  else
+    runtime.deliveryListeners?.forEach((listeners) =>
+      listeners.forEach((changed) => changed()),
+    );
 }

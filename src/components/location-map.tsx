@@ -29,7 +29,13 @@ export function LocationMap({
   select?: (pin: LocationPin) => void;
   pinLabel?: string;
   pinColor?: string;
-  markers?: { id: string; pin: LocationPin; label: string; color: string }[];
+  markers?: {
+    id: string;
+    pin: LocationPin;
+    label: string;
+    color: string;
+    number?: number;
+  }[];
   route?: Coordinate[];
   remainingRoute?: Coordinate[];
   navigation?: boolean;
@@ -218,6 +224,13 @@ export function LocationMap({
         .setLngLat(mapboxCoordinates(entry.pin))
         .addTo(map);
       point.getElement().setAttribute("aria-label", entry.label);
+      if (entry.number !== undefined) {
+        const number = document.createElement("span");
+        number.className = "map-stop-number";
+        number.textContent = String(entry.number);
+        number.setAttribute("aria-hidden", "true");
+        point.getElement().append(number);
+      }
       return point;
     });
     return () => points.forEach((point) => point.remove());

@@ -82,13 +82,31 @@ beforeEach(() => {
       branchId: other,
     },
   ];
-  fetcher.mockReset().mockResolvedValue({
-    ok: true,
-    json: async () => ({
-      rows: [],
-      pending: 0,
-      pagination: { page: 1, pageSize: 25, total: 0 },
-    }),
+  fetcher.mockReset().mockImplementation(async (url: string) => {
+    if (url.startsWith("/api/stock-planning?"))
+      return {
+        ok: true,
+        json: async () => ({
+          data: {
+            row: {
+              target: 32,
+              unit: "pairs",
+              available: 0,
+              incoming: 0,
+              openRefills: 0,
+              proposedRefill: 6,
+            },
+          },
+        }),
+      };
+    return {
+      ok: true,
+      json: async () => ({
+        rows: [],
+        pending: 0,
+        pagination: { page: 1, pageSize: 25, total: 0 },
+      }),
+    };
   });
   vi.stubGlobal("fetch", fetcher);
   action
@@ -144,11 +162,13 @@ it("links Manage branch to a dedicated branch URL", async () => {
   ]);
   expect(host.textContent).not.toContain("Manage location");
 });
-it("shows only the selected branch, its stock and its assigned drivers", async () => {
+it("shows the selected branch and its stock without branch-level driver cards", async () => {
   await mount();
   expect(host.textContent).toContain("Branch information");
   expect(host.textContent).toContain("Stock units");
-  expect(host.textContent).toContain("Assigned Driver");
+  expect(host.textContent).not.toContain("Assigned drivers");
+  expect(host.textContent).not.toContain("Wholesale backup setup");
+  expect(host.textContent).not.toContain("Automatic refill requests");
   expect(host.textContent).not.toContain("Other Branch Driver");
   expect(host.textContent).not.toContain("Other branch");
   expect(fetcher).toHaveBeenCalledWith(
@@ -157,7 +177,7 @@ it("shows only the selected branch, its stock and its assigned drivers", async (
   );
 });
 
-it("shows automatic requests for this branch with the physical balance and pending incoming stock", async () => {
+it("does not show automatic refill request cards on the branch detail page", async () => {
   fetcher.mockResolvedValue({
     ok: true,
     json: async () => ({
@@ -184,9 +204,8 @@ it("shows automatic requests for this branch with the physical balance and pendi
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 30));
   });
-  expect(host.textContent).toContain("Automatic refill requests");
-  expect(host.textContent).toContain("7 pairs on hand");
-  expect(host.textContent).toContain("12 pairs in pending refills");
+  expect(host.textContent).not.toContain("Automatic refill requests");
+  expect(host.textContent).not.toContain("7 pairs on hand");
 });
 it("reserves a refill for the selected branch and refreshes its history", async () => {
   await mount();
@@ -234,39 +253,8 @@ it("does not submit a refill above available HQ stock", async () => {
   expect(host.textContent).toContain("within the available source stock");
 });
 
-it("configures an initial backup target immediately without moving retail stock by default", async () => {
-  await mount();
-  const form = host.querySelector<HTMLFormElement>("#backup-setup form")!;
-  expect(form).not.toBeNull();
-  expect(form.querySelector<HTMLInputElement>("[name=retailMove]")!.value).toBe(
-    "0",
-  );
-  form.querySelector<HTMLInputElement>("[name=target]")!.value = "80";
-  form.querySelector<HTMLInputElement>("[name=reason]")!.value =
-    "Initial emergency reserve";
-  await act(async () => {
-    form.dispatchEvent(
-      new Event("submit", { bubbles: true, cancelable: true }),
-    );
-  });
-  expect(action).toHaveBeenCalledWith(
-    "backup_configure",
-    {
-      branchId,
-      productId: data.products[0].id,
-      target: 80,
-      retailMove: 0,
-      reason: "Initial emergency reserve",
-    },
-    expect.any(String),
-    {},
-  );
-  expect(
-    host.querySelector(`a[href="/stock-planning?branchId=${branchId}"]`),
-  ).not.toBeNull();
-});
-
-it("lets HQ explicitly reserve a wholesale backup refill", async () => {
+it("uses the saved backup target to prefill a branch refill", async () => {
+  data.branches[0].inventory![0].backupTarget = 32;
   await mount();
   await click("Refill stock");
   const form = host.querySelector<HTMLFormElement>("dialog form")!;
@@ -274,10 +262,12 @@ it("lets HQ explicitly reserve a wholesale backup refill", async () => {
     [...s.options].some((o) => o.value === "backup"),
   )!;
   await act(async () => {
-    pool.value = "backup";
-    pool.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
-  form.querySelector<HTMLInputElement>("[name=quantity]")!.value = "6";
+  expect(pool.value).toBe("backup");
+  expect(form.querySelector<HTMLInputElement>("[name=quantity]")!.value).toBe(
+    "6",
+  );
   form.querySelector<HTMLInputElement>("[name=reason]")!.value =
     "Emergency backup refill";
   await act(async () => {
@@ -290,15 +280,4 @@ it("lets HQ explicitly reserve a wholesale backup refill", async () => {
     quantity: 6,
     destinationBranchId: branchId,
   });
-});
-
-it("opens a backup refill directly from the selected reserve setup", async () => {
-  await mount();
-  await click("Refill wholesale backup");
-  const dialog = host.querySelector("dialog")!;
-  const pool = [...dialog.querySelectorAll("select")].find((s) =>
-    [...s.options].some((o) => o.value === "backup"),
-  )!;
-  expect(pool.value).toBe("backup");
-  expect(dialog.textContent).toContain("dedicated wholesale backup pool");
 });

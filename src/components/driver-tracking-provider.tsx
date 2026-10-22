@@ -82,7 +82,23 @@ export function DriverTrackingProvider({ children }: { children: ReactNode }) {
         setTrip(null);
         return;
       }
-      if (next.attemptId !== trip.attemptId || next.state === "stopped") {
+      if (
+        next.attemptId !== trip.attemptId ||
+        next.state === "stopped" ||
+        (!next.canPublish &&
+          next.run?.publisher &&
+          next.run.publisher.orderId !== trip.orderId)
+      ) {
+        if (
+          next.run?.publisher &&
+          next.run.publisher.orderId !== trip.orderId
+        ) {
+          setTrip({ ...trip, ...next.run.publisher });
+          setMessage(
+            "Continuing location sharing for the remaining picked-up deliveries.",
+          );
+          return;
+        }
         setMessage("Location sharing ended for this delivery.");
         setTrip(null);
         return;
@@ -161,6 +177,14 @@ export function DriverTrackingProvider({ children }: { children: ReactNode }) {
             if (!disposed) {
               setEligible(value.canPublish);
               if (
+                !value.canPublish &&
+                value.run?.publisher &&
+                value.run.publisher.orderId !== session.orderId
+              ) {
+                setTrip({ ...session, ...value.run.publisher });
+                return;
+              }
+              if (
                 value.state === "stopped" ||
                 value.attemptId !== session.attemptId
               )
@@ -232,7 +256,7 @@ export function DriverTrackingProvider({ children }: { children: ReactNode }) {
           lastSent = Date.now();
           setEligible(next.canPublish);
           setMessage(
-            "Live location is being shared with HQ and this order’s SME. Keep Supply Link open.",
+            "Live location is being shared with HQ and the customers of your picked-up deliveries. Keep Supply Link open.",
           );
         }
       } catch (error) {

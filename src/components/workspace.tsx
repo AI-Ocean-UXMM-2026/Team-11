@@ -37,6 +37,7 @@ import {
   Menu,
   Package,
   Plus,
+  RefreshCw,
   Search,
   Settings,
   ShieldCheck,
@@ -71,13 +72,18 @@ import type { WorkspaceQuery, ListKind } from "@/lib/workflow/query";
 import { OrderWorkflow } from "./order-workflow";
 import { DriverTrackingNotice } from "./delivery-tracking";
 import { BranchDetail } from "./branch-detail";
+import { BranchStock } from "./branch-stock";
 import { BranchNetwork, StockTransfers } from "./branch-network";
 import { DriverManagement } from "./driver-management";
+import { DeliveryGroupPlanner } from "./delivery-group-planner";
+import { DriverGroupPickup } from "./driver-group-pickup";
 import { WorkflowAdmin } from "./workflow-admin";
 import { NetworkArt } from "./network-art";
 import { SmeCheckout } from "./sme-checkout";
 import { SmeOrdersTable } from "./sme-orders-table";
 import { StockPlanning } from "./stock-planning";
+import { TakeoverReport } from "./takeover-report";
+import { BranchStockMovements } from "./branch-stock-movements";
 import { workspaceHref, portalLogin } from "@/lib/portals";
 
 type Nav = { key: string; label: string; icon: LucideIcon; badge?: string };
@@ -103,6 +109,7 @@ const navigations: Record<Role, Nav[]> = {
     { key: "deliveries", label: "Branch deliveries", icon: Truck },
     { key: "sales", label: "Retail sales", icon: ShoppingBag },
     { key: "inventory", label: "Branch stock", icon: Package },
+    { key: "stock-movements", label: "Stock Movement", icon: ArrowDownToLine },
     { key: "reports", label: "Sales reports", icon: Wallet },
   ],
   driver: [
@@ -119,6 +126,7 @@ const sectionTitles: Record<string, string> = {
   accounts: "Accounts & access",
   reports: "Sales & operations",
   "stock-planning": "Stock Planning",
+  "stock-movements": "Manage Stock Movement",
   settings: "Workspace settings",
   catalog: "STT shoe catalog",
   locations: "Supplier locations",
@@ -675,6 +683,14 @@ export function Workspace({
                 </td>
                 <td>
                   <Badge status={o.status} />
+                  {o.workflow?.fulfilment?.current && (
+                    <small>
+                      Phase {o.workflow.fulfilment.current.number} ·{" "}
+                      {o.workflow.fulfilment.current.state === "requested"
+                        ? "Awaiting branch acceptance"
+                        : o.workflow.fulfilment.deliveryStatus}
+                    </small>
+                  )}
                 </td>
                 <td className="date-column muted">
                   {new Date(o.date + "T00:00:00Z").toLocaleDateString("en-GB", {
@@ -899,7 +915,9 @@ export function Workspace({
                   "Manage branch")
                 : section === "overview"
                   ? "Overview"
-                  : sectionTitles[section]}
+                  : role === "branch" && section === "inventory"
+                    ? "Branch stock"
+                    : sectionTitles[section]}
             </strong>
           </div>
           <div className="topbar-tools">
@@ -979,7 +997,9 @@ export function Workspace({
                   <h1>
                     {role === "sme" && section === "orders"
                       ? "Your orders"
-                      : sectionTitles[section]}
+                      : role === "branch" && section === "inventory"
+                        ? "Branch stock"
+                        : sectionTitles[section]}
                   </h1>
                   <p className="subtitle">
                     {
@@ -998,6 +1018,8 @@ export function Workspace({
                             "Recorded sales, clear numbers. Shipping stays separate.",
                           "stock-planning":
                             "Branch backup reserves for HQ wholesale deliveries. Set targets, review alerts, and arrange refills.",
+                          "stock-movements":
+                            "Confirm incoming physical stock and review completed receipts.",
                           catalog:
                             "One STT shoe model. Choose the right sizes and colors for your shop.",
                           sales:
@@ -1115,6 +1137,15 @@ export function Workspace({
               Updating records…
             </p>
           )}
+          {role === "driver" &&
+            (section === "overview" || section === "deliveries") && (
+              <DriverGroupPickup
+                viewer={viewer}
+                demo={demo}
+                from={section === "overview" ? "overview" : "deliveries"}
+                refresh={() => snapshot.refetch({ throwOnError: true })}
+              />
+            )}
           {section === "overview" && (
             <>
               {role === "hq" && (
@@ -1243,7 +1274,7 @@ export function Workspace({
                   ? [
                       {
                         label: "Merchandise sales",
-                        value: money(summary.wholesale + retail, true),
+                        value: money(summary.wholesale + retail),
                         unit: "MMK",
                         note: "Retail + completed wholesale",
                         icon: Wallet,
@@ -1300,7 +1331,7 @@ export function Workspace({
                         },
                         {
                           label: "Completed purchases",
-                          value: money(summary.wholesale, true),
+                          value: money(summary.wholesale),
                           unit: "MMK",
                           note: "Merchandise, excluding shipping",
                           icon: ShoppingBag,
@@ -1488,6 +1519,12 @@ export function Workspace({
                                 <small>
                                   {o.location} · {o.items} pairs
                                 </small>
+                                {o.workflow?.fulfilment?.current && (
+                                  <small>
+                                    Phase {o.workflow.fulfilment.current.number}{" "}
+                                    · {o.workflow.fulfilment.deliveryStatus}
+                                  </small>
+                                )}
                               </span>
                               <Badge status={o.status} />
                               <ChevronRight size={17} />
@@ -1634,6 +1671,9 @@ export function Workspace({
             </>
           )}
 
+          {section === "orders" && (role === "hq" || role === "branch") && (
+            <DeliveryGroupPlanner viewer={viewer} />
+          )}
           {section === "orders" && (
             <section className="panel">
               <div className="filter-bar">
@@ -1659,6 +1699,7 @@ export function Workspace({
                   >
                     {[
                       "All orders",
+                      "Order remaining",
                       "Draft",
                       "Awaiting verification",
                       "Confirmed",
@@ -1680,22 +1721,14 @@ export function Workspace({
           )}
 
           {section === "inventory" && role === "branch" && (
-            <>
-              {(data.refillRequestCount ?? 0) > 0 && (
-                <p className="inline-note" role="status">
-                  Refill requested automatically from HQ for{" "}
-                  {data.refillRequestCount} low-stock alerts. Requests close
-                  when the affected pool reaches its threshold. Check incoming
-                  refills below.
-                </p>
-              )}
-              <StockTransfers
-                data={data}
-                viewer={viewer}
-                updated={applySnapshot}
-                pagination={pageControls("transfers", "Transfers")}
-              />
-            </>
+            <BranchStock
+              data={data}
+              branchId={viewer.branchId}
+              search={search}
+              onSearch={setSearch}
+              refresh={() => void snapshot.refetch()}
+              refreshing={snapshot.isFetching}
+            />
           )}
           {section === "branches" &&
             role === "hq" &&
@@ -1717,7 +1750,6 @@ export function Workspace({
           {section === "stock-planning" && role === "hq" && (
             <StockPlanning
               data={data}
-              openOrder={openOrder}
               initialBranchId={planningBranchId}
               viewer={viewer}
               demo={demo}
@@ -1726,7 +1758,17 @@ export function Workspace({
               }}
             />
           )}
-          {(section === "catalog" || section === "inventory") && (
+          {section === "stock-movements" && role === "branch" && (
+            <BranchStockMovements
+              data={data}
+              viewer={viewer}
+              updated={applySnapshot}
+              refresh={() => snapshot.refetch()}
+              transferPagination={pageControls("transfers", "Transfers")}
+            />
+          )}
+          {(section === "catalog" ||
+            (section === "inventory" && role === "hq")) && (
             <>
               <div className="catalog-tools">
                 <label className="search-field">
@@ -1765,17 +1807,8 @@ export function Workspace({
                         <tr>
                           <th>Product / pair</th>
                           <th>On hand</th>
-                          <th>
-                            {role === "branch" ? "Allocated" : "Reserved"}
-                          </th>
-                          {role === "branch" && (
-                            <th>Wholesale backup available</th>
-                          )}
-                          <th>
-                            {role === "branch"
-                              ? "Retail available"
-                              : "Wholesale available"}
-                          </th>
+                          <th>Reserved</th>
+                          <th>Wholesale available</th>
                           <th>Wholesale / pair</th>
                         </tr>
                       </thead>
@@ -1787,25 +1820,7 @@ export function Workspace({
                               <small>{p.pack}</small>
                             </td>
                             <td>{p.stock} pairs</td>
-                            <td>
-                              {role === "branch"
-                                ? (data.branches
-                                    .find((b) => b.id === viewer.branchId)
-                                    ?.inventory?.find(
-                                      (i) => i.productId === p.id,
-                                    )?.allocated ?? 0)
-                                : p.reserve}{" "}
-                              pairs
-                            </td>
-                            {role === "branch" && (
-                              <td>
-                                {data.branches
-                                  .find((b) => b.id === viewer.branchId)
-                                  ?.inventory?.find((i) => i.productId === p.id)
-                                  ?.protected ?? 0}{" "}
-                                pairs
-                              </td>
-                            )}
+                            <td>{p.reserve} pairs</td>
                             <td>
                               <Badge
                                 status={
@@ -1997,13 +2012,6 @@ export function Workspace({
           {section === "reports" && (
             <>
               <section className="panel report-filters" aria-busy={loading}>
-                <button
-                  className="button secondary"
-                  disabled={loading || reportPending}
-                  onClick={refreshReport}
-                >
-                  Refresh report
-                </button>
                 <label>
                   From
                   <input
@@ -2041,10 +2049,15 @@ export function Workspace({
                     ))}
                   </select>
                 </label>
-                <span className="timezone-note">
-                  <Clock3 size={16} />
-                  Business time: Yangon
-                </span>
+                <button
+                  className="icon-button report-refresh"
+                  aria-label="Refresh report"
+                  title="Refresh report"
+                  disabled={loading || reportPending}
+                  onClick={refreshReport}
+                >
+                  <RefreshCw size={20} aria-hidden="true" />
+                </button>
               </section>
               <div className="stats-grid report-stats">
                 {[
@@ -2061,7 +2074,7 @@ export function Workspace({
                       <Wallet size={18} />
                     </div>
                     <div className="stat-value">
-                      {money(s.value, true)}
+                      {money(s.value)}
                       <small>MMK</small>
                     </div>
                     <span className="muted">
@@ -2157,6 +2170,7 @@ export function Workspace({
                   />
                 )}
               </section>
+              <TakeoverReport viewer={viewer} openOrder={openOrder} />
             </>
           )}
 
@@ -2188,6 +2202,12 @@ export function Workspace({
                     <Badge status={o.status} />
                   </div>
                   <h2>{o.business}</h2>
+                  {o.workflow?.fulfilment?.current && (
+                    <p className="muted">
+                      Phase {o.workflow.fulfilment.current.number} ·{" "}
+                      {o.workflow.fulfilment.deliveryStatus}
+                    </p>
+                  )}
                   <p className="muted">
                     {o.reference} · {o.items} pairs
                   </p>
@@ -2796,8 +2816,8 @@ function Guide() {
         </span>
         <h3>Completion takes both sides</h3>
         <p>
-          HQ completes fulfilment and the SME confirms receipt. Done requires
-          both confirmations and no unresolved issue.
+          The driver confirms handover and the SME confirms receipt. Done
+          requires both confirmations for every pair and no unresolved issue.
         </p>
       </div>
     </div>

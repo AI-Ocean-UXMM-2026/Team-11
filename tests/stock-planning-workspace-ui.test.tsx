@@ -183,7 +183,9 @@ it("shows a compact overview and opens the Hlaing plan only after Manage, with f
     "Insufficient history — continue with the HQ manual plan.",
   );
   expect(host.textContent).not.toContain("Apply recommended target");
-  expect(host.textContent).toContain("Record takeover");
+  expect(host.textContent).not.toContain("Emergency fulfillment");
+  expect(host.textContent).not.toContain("Record takeover");
+  expect(host.textContent).toContain("Takeover history");
   expect(host.textContent).not.toContain("Safety buffer (%)");
   await act(async () => {
     host
@@ -259,6 +261,8 @@ it("shows an existing refill instead of offering a duplicate and does not count 
   expect(host.textContent).toContain("1 open backup refill");
   expect(host.textContent).toContain("In transit");
   expect(host.textContent).toContain("branch confirms physical receipt");
+  expect(host.textContent).toContain("Waiting for the branch to confirm physical receipt.");
+  expect(host.textContent).not.toContain("Confirm arrival date");
   expect(
     [...host.querySelectorAll("button")].some((b) =>
       b.textContent?.startsWith("Create refill"),

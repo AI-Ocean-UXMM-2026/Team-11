@@ -1027,12 +1027,20 @@
   color: #8d977f;
 }
 .report-filters {
-  padding: 20px;
+  position: relative;
+  padding: 20px 80px 20px 20px;
   display: flex;
   align-items: flex-end;
   gap: 20px;
   margin-bottom: 22px;
   flex-wrap: wrap;
+}
+.report-filters .report-refresh {
+  position: absolute;
+  top: 0;
+  right: 18px;
+  width: 44px;
+  min-height: 44px;
 }
 .report-filters label {
   display: flex;
@@ -1842,7 +1850,7 @@
   }
   .report-filters {
     gap: 13px;
-    padding: 18px;
+    padding: 18px 76px 18px 18px;
   }
   .report-filters label {
     flex: 1;

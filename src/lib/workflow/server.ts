@@ -105,10 +105,8 @@ export async function executeWorkflow(
       );
       return rows[0].result;
     });
-    notifyDemoTracking(
-      result.orderId ??
-        (typeof payload.orderId === "string" ? payload.orderId : undefined),
-    );
+    // Lifecycle changes can remove an earlier anonymous stop from sibling routes.
+    notifyDemoTracking();
     return result;
   }
   const db = await createClient();

@@ -72,3 +72,78 @@ file. HQ readback returned the existing branch history inside a rolled-back
 transaction. The migration adds checked read-only functions; existing business
 records were not changed. The security advisor reported the same findings as
 before the migration. UI refill verification ran only in the separate local demo.
+
+# Grouped delivery rollout — 22 October 2026
+
+The missing `public.delivery_dispatch_candidates()` RPC on the connected Supply
+Link project caused the HQ planner's schema-cache error. With explicit user
+approval, applied `20261022110558_grouped_delivery_routes.sql` and aligned its
+hosted migration record to the local version. Earlier stock-planning objects were
+already present despite gaps in their migration history; those migrations were
+not replayed.
+
+Verified the planner under the authenticated HQ role (two drivers, no ready
+orders), customer planning denial, and anonymous REST denial. REST recognizes the
+new function, so this is no longer `PGRST202`. The existing three orders and five
+profiles were retained, with no delivery groups created by verification. Current
+orders were one Shipping and two Done. HQ can click **Refresh orders** to clear
+the old error; new groups require at least two ready Confirmed/Preparing orders.
+
+Security and performance advisors were checked before and after rollout. The two
+private membership tables deliberately have no client grants/policies; the
+authenticated RPC entrypoints enforce actor/role checks. These correspond to
+the [RLS-without-policy informational notice](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
+and [authenticated SECURITY DEFINER review notice](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
+Existing [leaked-password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
+and [foreign-key index advisories](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys)
+remain outside this rollout.
+
+## Group acceptance and pickup rollout
+
+Applied `20261022121728_group_acceptance_pickup.sql` after explicit approval on
+22 October 2026. It was verified locally with
+271 passing tests, a production build and the isolated browser/API flow. This adds
+saved acceptance, atomic checked-parcel pickup, and routes that exclude uncollected
+stops. Existing collected groups derive acceptance from their first pickup time.
+Preflight and readback both found five orders, six profiles and one group.
+Digests of orders, delivery attempts and tracking matched before and after;
+existing acceptance was backfilled from the earliest recorded pickup. Both group
+stops were already handed over, so the authenticated driver read correctly
+returned no active groups. Customer read and mutation checks returned permission
+denial. Anonymous execute grants and direct client group-table reads remain denied.
+No real parcel was accepted, collected or handed over by verification.
+
+The tool-generated migration history record was aligned to the local filename
+with an exact version/name guard; no other migration records were changed.
+Security advisors report two additional authenticated SECURITY DEFINER entrypoints
+for the checked driver RPCs. They have empty search paths, active actor/ownership
+checks and anonymous execution revoked; review context is linked in the
+[function-execution advisory](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
+RLS and foreign-key index notice counts remain unchanged. This rollout does not
+change Realtime publications or require an environment-file update.
+
+## Phased fulfilment rollout
+
+Applied `20261022133817_phased_fulfilment_two_party_completion.sql` to Supply Link
+on 22 October 2026 after explicit approval. It supports sequential partial
+deliveries, persistent **Order remaining** with separate phase status, and final
+completion from driver handover plus SME receipt, without HQ confirmation.
+See [phased fulfilment](phased-fulfilment.md) for accounting and verification.
+
+Readback found eight orders, six profiles and six sales. Orders (excluding the
+new remaining marker), delivery attempts and inventory matched their preflight
+digests. No order qualified for automatic finalization. Verification did not
+create a live phase or perform any real pickup, receipt or stock movement.
+Authenticated HQ filtering and SME scoped reads succeeded; an SME phase-planning
+attempt was denied in a rolled-back transaction. Private ledgers have RLS enabled
+and no client grants; private helpers and anonymous RPC execution remain denied.
+Only this migration's generated history version was aligned to its local filename,
+using an exact version/name guard.
+
+Post-rollout advisors retain 11 authenticated SECURITY DEFINER review notices
+and the existing leaked-password protection warning. Two private phase ledgers
+add intentional [RLS-without-policy informational notices](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy):
+access is through checked RPCs, with direct client access revoked. The 36 existing
+foreign-key index notices are unchanged. Newly unused phase indexes are retained
+for phase lookups and foreign keys. No new exposed function permissions or
+Realtime publication changes were introduced.

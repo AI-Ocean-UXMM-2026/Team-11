@@ -7,24 +7,16 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import {
-  Building2,
-  PackagePlus,
-  Pencil,
-  RefreshCw,
-  Truck,
-  UserPlus,
-  X,
-} from "lucide-react";
+import { Building2, PackagePlus, Pencil, RefreshCw, X } from "lucide-react";
 import type { WorkspaceData, Viewer } from "@/lib/domain";
 import type { BranchHistory } from "@/lib/branch-history";
+import type { BackupPlanningDetail } from "@/lib/stock-planning";
 import { productPhoto } from "@/lib/checkout";
 import { locationSchema, pinFromForm } from "@/lib/contact";
 import { LocationLink } from "./location-link";
 import { LocationPicker } from "./location-picker";
 import { Pagination } from "./pagination";
 import { StockTransfers, useBranchAction } from "./branch-network";
-import { BranchBackupSetup } from "./branch-backup-setup";
 
 function BranchDialog({
   title,
@@ -84,9 +76,7 @@ export function BranchDetail({
   updated: (data: WorkspaceData, message?: string) => void | Promise<void>;
 }) {
   const branch = data.branches.find((b) => b.id === branchId);
-  const [modal, setModal] = useState<"refill" | "edit" | "drivers" | null>(
-    null,
-  );
+  const [modal, setModal] = useState<"refill" | "edit" | null>(null);
   const [direction, setDirection] = useState("refill");
   const [purpose, setPurpose] = useState<"retail" | "backup">("retail");
   const [productId, setProductId] = useState(data.products[0]?.id ?? "");
@@ -111,6 +101,27 @@ export function BranchDetail({
     refetchInterval: 30_000,
     retry: 1,
   });
+  const backupPlan = useQuery<BackupPlanningDetail>({
+    queryKey: ["backup-detail", viewer.id, demo, branchId, productId],
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({
+        view: "detail",
+        branchId,
+        productId,
+      });
+      const response = await fetch(`/api/stock-planning?${params}`, {
+        signal,
+        cache: "no-store",
+      });
+      const body = await response.json();
+      if (!response.ok || !body.data)
+        throw new Error(body.error ?? "Unable to load saved backup settings.");
+      return body.data;
+    },
+    enabled:
+      modal === "refill" && direction === "refill" && purpose === "backup",
+    retry: false,
+  });
   async function changed(next: WorkspaceData, message?: string) {
     await updated(next, message);
     await client.invalidateQueries({ queryKey: historyKey });
@@ -128,9 +139,7 @@ export function BranchDetail({
         </Link>
       </section>
     );
-  const drivers = data.accounts.filter(
-    (a) => a.role === "driver" && a.branchId === branch.id,
-  );
+  const currentBranch = branch;
   const product = data.products.find((p) => p.id === productId);
   const inventory = branch.inventory ?? [];
   const source = inventory.find((i) => i.productId === productId);
@@ -145,15 +154,27 @@ export function BranchDetail({
               (source?.protected ?? 0),
           )
       : Math.max(0, (product?.stock ?? 0) - (product?.reserve ?? 0));
+  const backupRow = backupPlan.data?.row;
+  const backupSuggestedRefill = backupRow?.proposedRefill ?? null;
+  const backupRefillQuantity =
+    backupSuggestedRefill === null
+      ? 0
+      : Math.min(backupSuggestedRefill, available);
   const open = branch.active !== false;
-  const refillRequests =
-    history.data?.refillRequests ??
-    data.refillRequests?.filter((r) => r.branchId === branchId) ??
-    [];
   function show(next: typeof modal) {
     setError("");
     setDirection("refill");
-    setPurpose("retail");
+    setPurpose(
+      next === "refill" &&
+        (currentBranch.inventory ?? []).some(
+          (item) =>
+            item.productId === productId &&
+            item.backupTarget !== null &&
+            item.backupTarget !== undefined,
+        )
+        ? "backup"
+        : "retail",
+    );
     setModal(next);
   }
   const failure = error ? (
@@ -305,86 +326,6 @@ export function BranchDetail({
           )}
         </div>
       </section>
-      <BranchBackupSetup
-        branch={branch}
-        updated={changed}
-        refillBackup={(productId) => {
-          show("refill");
-          setProductId(productId);
-          setPurpose("backup");
-        }}
-      />
-      {refillRequests.length > 0 && (
-        <section
-          className="panel info-pad"
-          aria-labelledby="branch-refill-requests-heading"
-        >
-          <h2 id="branch-refill-requests-heading">Automatic refill requests</h2>
-          <p className="muted">
-            HQ is notified when total on-hand stock is below 10 or dedicated
-            backup is below its configured target. Review pending refills before
-            reserving more stock.
-          </p>
-          <ul>
-            {refillRequests.map((request) => (
-              <li key={request.id}>
-                <strong>{request.variant}</strong>: {request.onHand} pairs{" "}
-                {request.pool === "backup" ? "in backup" : "on hand"} ·
-                threshold {request.threshold}
-                {request.incoming > 0 && (
-                  <> · {request.incoming} pairs in pending refills</>
-                )}
-              </li>
-            ))}
-          </ul>
-          <button className="button primary" onClick={() => show("refill")}>
-            <PackagePlus size={18} /> Refill stock
-          </button>
-        </section>
-      )}
-      <section
-        className="panel branch-drivers"
-        aria-labelledby="branch-drivers-heading"
-      >
-        <div className="panel-heading">
-          <div>
-            <h2 id="branch-drivers-heading">
-              Assigned drivers{" "}
-              <span className="count-chip">{drivers.length}</span>
-            </h2>
-            <p className="muted">Drivers affiliated with {branch.name}.</p>
-          </div>
-          {open && (
-            <button
-              className="button secondary"
-              onClick={() => show("drivers")}
-            >
-              <UserPlus size={17} />
-              Manage drivers
-            </button>
-          )}
-        </div>
-        <div className="branch-driver-list">
-          {drivers.map((driver) => (
-            <div className="branch-driver-row" key={driver.id}>
-              <span className="branch-icon">
-                <Truck size={22} />
-              </span>
-              <div>
-                <strong>{driver.name}</strong>
-                <small>{driver.phone || "No contact number saved"}</small>
-              </div>
-              <span className="workflow-status">{driver.status}</span>
-            </div>
-          ))}
-          {!drivers.length && (
-            <p className="info-pad muted">
-              No drivers assigned yet. Assign a driver to make deliveries from
-              this branch.
-            </p>
-          )}
-        </div>
-      </section>
       <div aria-busy={history.isFetching}>
         {history.error && (
           <div className="branch-history-error" role="alert">
@@ -485,7 +426,7 @@ export function BranchDetail({
                 : "Refill stock"
               : modal === "edit"
                 ? "Edit branch"
-                : "Manage assigned drivers"
+                : "Refill stock"
           }
           pending={pending}
           close={() => setModal(null)}
@@ -553,6 +494,40 @@ export function BranchDetail({
                   <option value="backup">Wholesale backup stock</option>
                 </select>
               </label>
+              {direction === "refill" &&
+                purpose === "backup" &&
+                (backupPlan.isPending ? (
+                  <p className="inline-note" role="status">
+                    Loading the saved backup target…
+                  </p>
+                ) : backupPlan.isError ? (
+                  <div className="form-error" role="alert">
+                    <p>{backupPlan.error.message}</p>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      onClick={() => void backupPlan.refetch()}
+                    >
+                      Retry loading backup settings
+                    </button>
+                  </div>
+                ) : backupRow?.target !== null && backupRow ? (
+                  <p className="inline-note">
+                    Saved target: {backupRow.target} {backupRow.unit} · Current
+                    backup: {backupRow.available} {backupRow.unit} · Incoming:{" "}
+                    {backupRow.incoming} {backupRow.unit}.
+                    {backupRow.openRefills > 0
+                      ? ` ${backupRow.openRefills} backup refill${backupRow.openRefills === 1 ? " is" : "s are"} already open.`
+                      : backupSuggestedRefill
+                        ? ` Suggested refill: ${backupSuggestedRefill} ${backupRow.unit}${backupSuggestedRefill > available ? `; HQ has ${available} available, so the quantity is capped.` : "."}`
+                        : " No refill is needed to meet the saved target."}
+                  </p>
+                ) : (
+                  <p className="inline-note">
+                    No saved backup target for this SKU. You can enter a manual
+                    refill amount or configure the target in Stock Planning.
+                  </p>
+                ))}
               <label className="field">
                 Shoe variant
                 <select
@@ -576,14 +551,27 @@ export function BranchDetail({
               </label>
               <div className="form-grid">
                 <label className="field">
-                  Pairs
+                  {direction === "refill" && purpose === "backup"
+                    ? (backupRow?.unit ?? "Pairs")
+                    : "Pairs"}
                   <input
+                    key={`${productId}:${purpose}:${backupPlan.data?.row.proposedRefill ?? "pending"}`}
                     name="quantity"
                     type="number"
                     min={1}
                     max={available}
                     step={1}
                     required
+                    defaultValue={
+                      direction === "refill" && purpose === "backup"
+                        ? backupRefillQuantity || undefined
+                        : undefined
+                    }
+                    disabled={
+                      direction === "refill" &&
+                      purpose === "backup" &&
+                      backupPlan.isPending
+                    }
                   />
                 </label>
                 <label className="field">
@@ -616,7 +604,18 @@ export function BranchDetail({
                 </button>
                 <button
                   className="button primary"
-                  disabled={pending || available < 1}
+                  disabled={
+                    pending ||
+                    available < 1 ||
+                    (direction === "refill" &&
+                      purpose === "backup" &&
+                      (backupPlan.isPending ||
+                        backupPlan.isError ||
+                        (backupRow?.openRefills ?? 0) > 0 ||
+                        (backupRow?.target !== null &&
+                          backupRow?.target !== undefined &&
+                          !backupSuggestedRefill)))
+                  }
                 >
                   {pending
                     ? "Reserving stock…"
@@ -678,60 +677,6 @@ export function BranchDetail({
               {failure}
               <button className="button primary" disabled={pending}>
                 Save branch details
-              </button>
-            </form>
-          )}
-          {modal === "drivers" && (
-            <form
-              className="modal-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const values = new FormData(e.currentTarget);
-                act(
-                  "driver_affiliation",
-                  {
-                    driverId: values.get("driverId"),
-                    branchId: values.get("branchId"),
-                    reason: values.get("reason"),
-                  },
-                  () => setModal(null),
-                );
-              }}
-            >
-              <p className="muted">
-                Assign a driver to {branch.name}, or move an affiliated driver
-                back to HQ. Active deliveries must be resolved before
-                reassignment.
-              </p>
-              <label className="field">
-                Driver
-                <select name="driverId" required>
-                  <option value="">Choose driver</option>
-                  {data.accounts
-                    .filter(
-                      (a) => a.role === "driver" && a.status !== "Suspended",
-                    )
-                    .map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} · {a.branchName ?? "HQ"}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label className="field">
-                Assigned location
-                <select name="branchId" defaultValue={branch.id}>
-                  <option value={branch.id}>{branch.name}</option>
-                  <option value="">STT Yangon HQ</option>
-                </select>
-              </label>
-              <label className="field">
-                Reason
-                <input name="reason" minLength={3} maxLength={300} required />
-              </label>
-              {failure}
-              <button className="button primary" disabled={pending}>
-                Update driver affiliation
               </button>
             </form>
           )}

@@ -44,6 +44,7 @@ export function DeliveryRoute({
     mode,
     data.destination?.latitude,
     data.destination?.longitude,
+    JSON.stringify(data.run?.stops ?? []),
   ];
   const query = useQuery<RouteResponse>({
     queryKey: key,
@@ -113,7 +114,7 @@ export function DeliveryRoute({
           },
         ]
       : []),
-    ...(data.destination && data.point
+    ...(data.destination && data.point && !data.run
       ? [
           {
             id: "destination",
@@ -123,6 +124,17 @@ export function DeliveryRoute({
           },
         ]
       : []),
+    ...(data.run?.stops
+      .filter((stop) => !!data.point || !stop.own)
+      .map((stop) => ({
+        id: `stop-${stop.position}`,
+        pin: stop.pin,
+        label: stop.own
+          ? `Stop ${stop.position}: your delivery destination`
+          : `Stop ${stop.position}: ${viewer.role === "sme" ? "earlier delivery stop" : "delivery destination"}`,
+        color: stop.own ? "#17674f" : "#a66a15",
+        number: stop.position,
+      })) ?? []),
   ];
   return (
     <div
@@ -137,6 +149,43 @@ export function DeliveryRoute({
           <span role="status">{route ? "Updating…" : "Finding roads…"}</span>
         )}
       </div>
+      {data.run && data.run.stops.length > 0 && (
+        <div className="route-stop-summary">
+          <strong>
+            {viewer.role === "sme"
+              ? "Your delivery route"
+              : "Ordered drop-offs"}
+          </strong>
+          <ol className="route-stop-list">
+            {data.run.stops.map((stop) => (
+              <li key={stop.position}>
+                <span className={stop.own ? "stop-badge own" : "stop-badge"}>
+                  {stop.position}
+                </span>
+                <span>
+                  {viewer.role === "sme"
+                    ? stop.own
+                      ? "Your delivery"
+                      : "Earlier delivery stop"
+                    : `Drop-off ${stop.position}`}
+                  {viewer.role !== "sme" && !focused && stop.business && (
+                    <small>
+                      {stop.business} · {stop.reference}
+                    </small>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ol>
+          {viewer.role === "sme" &&
+            data.run.stops.some((stop) => !stop.own) && (
+              <p className="muted">
+                The driver has another stop before yours. Other customers’
+                delivery details are private.
+              </p>
+            )}
+        </div>
+      )}
       {route && progress && (
         <>
           <div className="route-metrics" aria-label="Route estimate">
