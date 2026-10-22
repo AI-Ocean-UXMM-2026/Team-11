@@ -18,6 +18,30 @@ vi.mock("mapbox-gl", () => {
     remove = vi.fn(() => this.canvas.remove());
     resize = vi.fn();
     jumpTo = vi.fn();
+    fitBounds = vi.fn();
+    easeTo = vi.fn();
+    sources: Record<
+      string,
+      { data: unknown; setData: ReturnType<typeof vi.fn> }
+    > = {};
+    layers: any[] = [];
+    isStyleLoaded() {
+      return true;
+    }
+    getSource(id: string) {
+      return this.sources[id];
+    }
+    addSource(id: string, options: any) {
+      this.sources[id] = {
+        data: options.data,
+        setData: vi.fn((data: unknown) => {
+          this.sources[id].data = data;
+        }),
+      };
+    }
+    addLayer(layer: any) {
+      this.layers.push(layer);
+    }
     controls: { control: unknown; position: string }[] = [];
     constructor(public options: any) {
       options.container.append(this.canvas);
@@ -195,6 +219,43 @@ it("explains missing configuration without making a map request or losing a stor
   expect(new FormData(host.querySelector("form")!).get("longitude")).toBe("0");
 });
 
+it("frames driver and destination pins clear of map controls and keeps their labels and colors", async () => {
+  await render(
+    <LocationMap
+      label="Delivery tracking"
+      pin={{ latitude: 16.84, longitude: 96.13 }}
+      pinLabel="Driver's last reported location"
+      pinColor="#2868b2"
+      markers={[
+        {
+          id: "destination",
+          pin: { latitude: 16.83, longitude: 96.17 },
+          label: "Delivery destination",
+          color: "#17674f",
+        },
+      ]}
+    />,
+  );
+  expect(sdk.markers[0].options.color).toBe("#2868b2");
+  expect(
+    sdk.markers.some(
+      (m: any) =>
+        m.options.color === "#17674f" &&
+        m.element.getAttribute("aria-label") === "Delivery destination",
+    ),
+  ).toBe(true);
+  expect(sdk.maps[0].fitBounds).toHaveBeenCalledWith(
+    [
+      [96.13, 16.83],
+      [96.17, 16.84],
+    ],
+    expect.objectContaining({
+      padding: { top: 55, bottom: 50, left: 90, right: 80 },
+    }),
+  );
+  expect(sdk.maps[0].jumpTo).not.toHaveBeenCalled();
+});
+
 it("opens a saved pin in a read-only dialog and closes it without following an external link", async () => {
   await render(
     <p>
@@ -231,5 +292,67 @@ it("reports provider errors and allows keyboard pin placement", async () => {
   );
   expect(new FormData(host.querySelector("form")!).get("longitude")).toBe(
     "96.17",
+  );
+});
+
+it("draws road geometry and remaining progress without replacing the map, with explicit follow and route overview controls", async () => {
+  const route: [number, number][] = [
+    [96.1, 16.8],
+    [96.12, 16.8],
+    [96.12, 16.82],
+  ];
+  const node = (remaining = route) => (
+    <LocationMap
+      label="Delivery tracking"
+      pin={{ latitude: 16.8, longitude: 96.1 }}
+      pinColor="#2868b2"
+      navigation
+      route={route}
+      remainingRoute={remaining}
+    />
+  );
+  await render(node());
+  await act(async () => sdk.maps[0].emit("load"));
+  expect(
+    sdk.maps[0].sources["delivery-road-route"].data.features[0].geometry
+      .coordinates,
+  ).toEqual(route);
+  expect(
+    sdk.maps[0].layers.find((l: any) => l.id === "delivery-road-remaining")
+      .paint["line-color"],
+  ).toBe("#2868b2");
+  await render(
+    node([
+      [96.11, 16.8],
+      [96.12, 16.8],
+      [96.12, 16.82],
+    ]),
+  );
+  expect(sdk.maps).toHaveLength(1);
+  expect(
+    sdk.maps[0].sources["delivery-road-remaining"].data.features[0].geometry
+      .coordinates[0],
+  ).toEqual([96.11, 16.8]);
+  await act(async () =>
+    [...host.querySelectorAll("button")]
+      .find((b) => b.textContent?.includes("Recenter on me"))!
+      .click(),
+  );
+  expect(sdk.maps[0].easeTo).toHaveBeenCalledWith(
+    expect.objectContaining({ center: [96.1, 16.8], zoom: 16 }),
+  );
+  await act(async () => sdk.maps[0].emit("dragstart"));
+  expect(host.querySelector('[aria-pressed="true"]')?.textContent).toContain(
+    "Show full route",
+  );
+  await render(
+    <LocationMap
+      label="Delivery tracking"
+      pin={{ latitude: 16.8, longitude: 96.1 }}
+      pinColor="#2868b2"
+    />,
+  );
+  expect(sdk.maps[0].sources["delivery-road-route"].data.features).toHaveLength(
+    0,
   );
 });

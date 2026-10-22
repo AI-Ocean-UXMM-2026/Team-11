@@ -15,6 +15,7 @@ import {
 } from "@/lib/workflow/client";
 import {
   ArrowDownToLine,
+  AlertTriangle,
   ArrowRight,
   ArrowUpRight,
   Bell,
@@ -65,14 +66,17 @@ import { workflowAction } from "@/app/workflow-actions";
 import { Pagination } from "./pagination";
 import { PhoneField } from "./phone-field";
 import { LocationPicker } from "./location-picker";
-import { internationalPhone, pinFromForm, locationSchema } from "@/lib/contact";
+import { pinFromForm, locationSchema } from "@/lib/contact";
 import type { WorkspaceQuery, ListKind } from "@/lib/workflow/query";
 import { OrderWorkflow } from "./order-workflow";
 import { DriverTrackingNotice } from "./delivery-tracking";
+import { BranchDetail } from "./branch-detail";
 import { BranchNetwork, StockTransfers } from "./branch-network";
+import { DriverManagement } from "./driver-management";
 import { WorkflowAdmin } from "./workflow-admin";
 import { NetworkArt } from "./network-art";
-import { ShoeCatalog } from "./shoe-catalog";
+import { SmeCheckout } from "./sme-checkout";
+import { SmeOrdersTable } from "./sme-orders-table";
 import { workspaceHref, portalLogin } from "@/lib/portals";
 
 type Nav = { key: string; label: string; icon: LucideIcon; badge?: string };
@@ -82,6 +86,7 @@ const navigations: Record<Role, Nav[]> = {
     { key: "orders", label: "Wholesale orders", icon: ClipboardList },
     { key: "inventory", label: "Shoes & stock", icon: Package },
     { key: "branches", label: "Branches", icon: Store },
+    { key: "drivers", label: "Driver", icon: Truck },
     { key: "accounts", label: "Accounts & access", icon: Users },
     { key: "reports", label: "Reports", icon: Wallet },
   ],
@@ -108,6 +113,7 @@ const sectionTitles: Record<string, string> = {
   orders: "Wholesale orders",
   inventory: "Shoes & stock",
   branches: "Your branch network",
+  drivers: "Driver",
   accounts: "Accounts & access",
   reports: "Sales & operations",
   settings: "Workspace settings",
@@ -148,10 +154,12 @@ function Modal({
   title,
   children,
   close,
+  className = "",
 }: {
   title: string;
   children: React.ReactNode;
   close: () => void;
+  className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -160,7 +168,7 @@ function Modal({
   return (
     <dialog
       ref={ref}
-      className="modal"
+      className={`modal ${className}`}
       aria-labelledby="modal-title"
       onCancel={close}
       onClick={(e) => {
@@ -187,11 +195,15 @@ export function Workspace({
   viewer,
   demo,
   section,
+  branchId,
+  restoreOrderId,
 }: {
   data: WorkspaceData;
   viewer: Viewer;
   demo: boolean;
   section: string;
+  branchId?: string;
+  restoreOrderId?: string;
 }) {
   const [query, setQuery] = useState<WorkspaceQuery>(initialData.query ?? {});
   const [exporting, setExporting] = useState(false);
@@ -211,11 +223,12 @@ export function Workspace({
   const [narrow, setNarrow] = useState(false);
   const navRef = useRef<HTMLElement>(null);
   const [modal, setModal] = useState<
-    "account" | "notifications" | "help" | "order" | "sale" | null
+    "account" | "notifications" | "help" | "sale" | null
   >(null);
-  const [selected, setSelected] = useState<Order | null>(null);
+  const [selected, setSelected] = useState<Order | null>(
+    restoreOrderId ? (initialData.selectedOrder ?? null) : null,
+  );
   const [toast, setToast] = useState("");
-  const [basket, setBasket] = useState<Record<string, number>>({});
   const [formError, setFormError] = useState("");
   const [pending, startTransition] = useTransition();
   const [reportChannel, setReportChannel] = useState(
@@ -391,10 +404,6 @@ export function Workspace({
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
-  const cart = data.products
-    .filter((p) => basket[p.id])
-    .map((p) => ({ ...p, quantity: basket[p.id] }));
-  const subtotal = cart.reduce((sum, p) => sum + p.price * p.quantity, 0);
   const reportEvents = data.salesEvents ?? [];
   const reportWholesale = data.report?.wholesale ?? 0;
   const reportRetail = data.report?.retail ?? 0;
@@ -552,37 +561,6 @@ export function Workspace({
       }
     });
   }
-  function createOrder(form: FormData) {
-    const phone = internationalPhone(
-      String(form.get("phone") ?? ""),
-      String(form.get("phoneCountry") ?? "MM"),
-    );
-    if (!phone) {
-      setFormError(
-        "Enter a valid receiver phone number for the selected country.",
-      );
-      return;
-    }
-    mutate(
-      "create",
-      {
-        items: cart.map((p) => ({ productId: p.id, quantity: p.quantity })),
-        receiver: String(form.get("receiver") ?? ""),
-        phone,
-        pin: pinFromForm(form),
-        address: String(form.get("address") ?? ""),
-        area: data.settings?.area ?? "Yangon",
-        expectedTotal: subtotal + (data.settings?.shipping ?? 0),
-      },
-      (next, id) => {
-        setBasket({});
-        setModal(null);
-        setSelected(
-          next.selectedOrder ?? next.orders.find((o) => o.id === id) ?? null,
-        );
-      },
-    );
-  }
   function createAccount(form: FormData) {
     const pin = locationSchema.safeParse(pinFromForm(form));
     if (!pin.success) {
@@ -638,82 +616,88 @@ export function Workspace({
     );
   }
 
-  const orderTable = (limit?: number) => (
-    <div className="table-scroll">
-      <table className="orders-table">
-        <thead>
-          <tr>
-            <th>Order / business</th>
-            <th>Order value</th>
-            <th>Status</th>
-            <th className="date-column">Placed on</th>
-            <th>
-              <span className="sr-only">Open</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {matchedOrders.slice(0, limit).map((o) => (
-            <tr key={o.id}>
-              <td>
-                <button
-                  className="business-cell"
-                  onClick={() => setSelected(o)}
-                >
-                  <span
-                    className={`avatar avatar-${Number(o.id.slice(-1)) % 3}`}
-                  >
-                    {o.initials}
-                  </span>
-                  <span>
-                    <strong>{o.business}</strong>
-                    <small>
-                      {o.reference} <span className="dot-separator">·</span>{" "}
-                      {o.items} pairs
-                    </small>
-                  </span>
-                </button>
-              </td>
-              <td className="amount">
-                {money(total(o))}
-                <small>MMK</small>
-              </td>
-              <td>
-                <Badge status={o.status} />
-              </td>
-              <td className="date-column muted">
-                {new Date(o.date + "T00:00:00Z").toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "short",
-                  timeZone: "UTC",
-                })}
-              </td>
-              <td>
-                <button
-                  className="icon-button"
-                  aria-label={`View ${o.reference}`}
-                  onClick={() => setSelected(o)}
-                >
-                  <Icon icon={ChevronRight} size={17} />
-                </button>
-              </td>
+  const orderTable = (limit?: number) =>
+    role === "sme" ? (
+      <SmeOrdersTable
+        orders={matchedOrders.slice(0, limit)}
+        openOrder={setSelected}
+      />
+    ) : (
+      <div className="table-scroll">
+        <table className="orders-table">
+          <thead>
+            <tr>
+              <th>Order / business</th>
+              <th>Order value</th>
+              <th>Status</th>
+              <th className="date-column">Placed on</th>
+              <th>
+                <span className="sr-only">Open</span>
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {matchedOrders.length === 0 && (
-        <Empty
-          icon={ClipboardList}
-          title="No orders here yet"
-          text={
-            search
-              ? "Try another business name or order reference."
-              : "Orders matching this selection will appear here."
-          }
-        />
-      )}
-    </div>
-  );
+          </thead>
+          <tbody>
+            {matchedOrders.slice(0, limit).map((o) => (
+              <tr key={o.id}>
+                <td>
+                  <button
+                    className="business-cell"
+                    onClick={() => setSelected(o)}
+                  >
+                    <span
+                      className={`avatar avatar-${Number(o.id.slice(-1)) % 3}`}
+                    >
+                      {o.initials}
+                    </span>
+                    <span>
+                      <strong>{o.business}</strong>
+                      <small>
+                        {o.reference} <span className="dot-separator">·</span>{" "}
+                        {o.items} pairs
+                      </small>
+                    </span>
+                  </button>
+                </td>
+                <td className="amount">
+                  {money(total(o))}
+                  <small>MMK</small>
+                </td>
+                <td>
+                  <Badge status={o.status} />
+                </td>
+                <td className="date-column muted">
+                  {new Date(o.date + "T00:00:00Z").toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    timeZone: "UTC",
+                  })}
+                </td>
+                <td>
+                  <button
+                    className="icon-button"
+                    aria-label={`View ${o.reference}`}
+                    onClick={() => setSelected(o)}
+                  >
+                    <Icon icon={ChevronRight} size={17} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {matchedOrders.length === 0 && (
+          <Empty
+            icon={ClipboardList}
+            title="No orders here yet"
+            text={
+              search
+                ? "Try another business name or order reference."
+                : "Orders matching this selection will appear here."
+            }
+          />
+        )}
+      </div>
+    );
   const branchPanel = (
     <section className="panel branch-panel">
       <div className="panel-heading">
@@ -899,7 +883,12 @@ export function Workspace({
             <span className="context-role">{roleNames[role]}</span>
             <ChevronRight size={14} />
             <strong>
-              {section === "overview" ? "Overview" : sectionTitles[section]}
+              {branchId
+                ? (data.branches.find((b) => b.id === branchId)?.name ??
+                  "Manage branch")
+                : section === "overview"
+                  ? "Overview"
+                  : sectionTitles[section]}
             </strong>
           </div>
           <div className="topbar-tools">
@@ -930,11 +919,27 @@ export function Workspace({
             </button>
           </div>
         </header>
-        <main id="main" className="main-content">
+        <main
+          id="main"
+          className={`main-content${role === "sme" && section === "catalog" ? " catalog-page" : ""}`}
+        >
           <DriverTrackingNotice viewer={viewer} />
           <div className="page-heading">
             <div>
-              {section === "overview" ? (
+              {branchId ? (
+                <>
+                  <p className="greeting">
+                    <Link href="/branches">← Back to branches</Link>
+                  </p>
+                  <h1>
+                    {data.branches.find((b) => b.id === branchId)?.name ??
+                      "Manage branch"}
+                  </h1>
+                  <p className="subtitle">
+                    Branch stock, drivers and refill history in one place.
+                  </p>
+                </>
+              ) : section === "overview" ? (
                 <>
                   <p className="greeting">
                     Good morning, {viewer.name.split(" ")[0]}{" "}
@@ -974,6 +979,8 @@ export function Workspace({
                           inventory:
                             "The right stock, in the right place, at the right time.",
                           branches: "Local branches. One connected business.",
+                          drivers:
+                            "View your drivers and manage their branch affiliations.",
                           accounts:
                             "Bring your business customers and delivery team on board.",
                           reports:
@@ -1032,6 +1039,17 @@ export function Workspace({
                     </button>
                   )}
                 </>
+              ) : section === "drivers" && role === "hq" ? (
+                <button
+                  className="button primary"
+                  onClick={() => {
+                    setAccountRole("driver");
+                    open("account");
+                  }}
+                >
+                  <Plus size={17} />
+                  Create driver
+                </button>
               ) : section === "accounts" ? (
                 <button
                   className="button primary"
@@ -1086,6 +1104,64 @@ export function Workspace({
           )}
           {section === "overview" && (
             <>
+              {role === "hq" && (
+                <section
+                  className={`hq-hold-priority ${summary.held ? "has-holds" : ""}`}
+                  aria-label="Orders requiring HQ attention"
+                >
+                  <div className="hq-hold-priority-heading">
+                    <span className="hold-priority-icon">
+                      <AlertTriangle size={26} />
+                    </span>
+                    <div>
+                      <h2>
+                        {summary.held
+                          ? `${summary.held} ${summary.held === 1 ? "order needs" : "orders need"} your attention`
+                          : "No orders on hold"}
+                      </h2>
+                      <p>
+                        {summary.held
+                          ? "Resolve delivery holds first to keep your shops supplied."
+                          : "Delivery holds will appear here as soon as they need your help."}
+                      </p>
+                    </div>
+                    {summary.held > 0 && (
+                      <button
+                        className="button hold-review-button"
+                        onClick={() => {
+                          setStatusFilter("On hold");
+                          document
+                            .getElementById("recent-orders")
+                            ?.scrollIntoView({ block: "start" });
+                        }}
+                      >
+                        Review held orders
+                        <ArrowRight size={17} />
+                      </button>
+                    )}
+                  </div>
+                  {held.length > 0 && (
+                    <div className="hq-hold-priority-list">
+                      {held.slice(0, 3).map((o) => (
+                        <button key={o.id} onClick={() => setSelected(o)}>
+                          <div>
+                            <strong>{o.business}</strong>
+                            <small>{o.reference}</small>
+                            <p>
+                              {o.workflow?.issue ??
+                                "Delivery paused. Review the order and arrange the next step."}
+                            </p>
+                          </div>
+                          <span>
+                            Resolve hold
+                            <ArrowRight size={16} />
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
               <section className="network-hero">
                 <div className="hero-copy">
                   <span className="hero-kicker">
@@ -1320,7 +1396,7 @@ export function Workspace({
                       <SalesList sales={data.retailSales} />
                     </section>
                   ) : (
-                    <section className="panel">
+                    <section className="panel" id="recent-orders">
                       <div className="panel-heading">
                         <div className="heading-inline">
                           <h2>
@@ -1363,6 +1439,15 @@ export function Workspace({
                             {summary.awaiting > 0 && (
                               <span>{summary.awaiting}</span>
                             )}
+                          </button>
+                          <button
+                            className={
+                              statusFilter === "On hold" ? "selected" : ""
+                            }
+                            onClick={() => setStatusFilter("On hold")}
+                          >
+                            On hold
+                            {summary.held > 0 && <span>{summary.held}</span>}
                           </button>
                           <button
                             className={
@@ -1589,12 +1674,22 @@ export function Workspace({
               pagination={pageControls("transfers", "Transfers")}
             />
           )}
-          {section === "branches" && role === "hq" && (
-            <BranchNetwork
-              data={data}
-              updated={applySnapshot}
-              pagination={pageControls("transfers", "Transfers")}
-            />
+          {section === "branches" &&
+            role === "hq" &&
+            (branchId ? (
+              <BranchDetail
+                key={branchId}
+                data={data}
+                viewer={viewer}
+                demo={demo}
+                branchId={branchId}
+                updated={applySnapshot}
+              />
+            ) : (
+              <BranchNetwork data={data} updated={applySnapshot} />
+            ))}
+          {section === "drivers" && role === "hq" && (
+            <DriverManagement data={data} updated={applySnapshot} />
           )}
           {(section === "catalog" || section === "inventory") && (
             <>
@@ -1608,18 +1703,6 @@ export function Workspace({
                     placeholder="Search shoe size or color…"
                   />
                 </label>
-                {section === "catalog" && (
-                  <button
-                    className="button primary"
-                    disabled={
-                      !cart.length || data.settings?.shipping == null || pending
-                    }
-                    onClick={() => open("order")}
-                  >
-                    <ShoppingBag size={17} />
-                    Review order ({cart.reduce((s, p) => s + p.quantity, 0)})
-                  </button>
-                )}
               </div>
               <div className="supplier-catalog-note">
                 <ShieldCheck size={17} />
@@ -1679,14 +1762,17 @@ export function Workspace({
                   </div>
                 </section>
               ) : (
-                <ShoeCatalog
-                  products={matchedProducts}
-                  basket={basket}
-                  change={setBasket}
+                <SmeCheckout
+                  data={data}
+                  viewer={viewer}
+                  search={search}
+                  query={effectiveQuery}
+                  updated={applySnapshot}
+                  viewOrder={setSelected}
                   demo={demo}
                 />
               )}
-              {!matchedProducts.length && (
+              {!matchedProducts.length && section === "inventory" && (
                 <Empty
                   icon={Package}
                   title="No products found"
@@ -2062,7 +2148,7 @@ export function Workspace({
                   {role === "driver" && (
                     <p className="inline-note">
                       {o.workflow?.pickedUpAt
-                        ? "Pickup confirmed. Open delivery details to view or resume live location sharing."
+                        ? "Pickup confirmed. Open delivery details, then Open delivery view to follow the route or resume location sharing."
                         : "Open delivery details and confirm pickup after collecting the parcel."}
                     </p>
                   )}
@@ -2202,30 +2288,34 @@ export function Workspace({
       )}
 
       {modal === "account" && (
-        <Modal title="Issue a portal login" close={() => setModal(null)}>
+        <Modal
+          title="Issue a portal login"
+          close={() => setModal(null)}
+          className="account-modal"
+        >
           <form
             onSubmit={(e) => {
               e.preventDefault();
               createAccount(new FormData(e.currentTarget));
             }}
-            className="modal-form"
+            className="modal-form account-form"
           >
             <p className="muted">
               Issue a login account and temporary password. The user changes it
               before entering their portal.{" "}
               {demo && "Demo credentials work until this server restarts."}
             </p>
-            <label className="field">
-              Full name or business name
-              <input
-                name="name"
-                required
-                minLength={2}
-                maxLength={100}
-                placeholder="e.g. Mingalar Shoe Store"
-              />
-            </label>
-            <div className="form-grid">
+            <div className="account-details">
+              <label className="field">
+                Full name or business name
+                <input
+                  name="name"
+                  required
+                  minLength={2}
+                  maxLength={100}
+                  placeholder="e.g. Mingalar Shoe Store"
+                />
+              </label>
               <label className="field">
                 Role
                 <select
@@ -2240,45 +2330,37 @@ export function Workspace({
                   <option value="branch">Branch staff</option>
                 </select>
               </label>
-              <div className="field">
-                <span>Account ID</span>
-                <div className="generated-id-note">
-                  UUID generated when you create the account
-                </div>
-                <small>
-                  The unique ID appears with the temporary password after
-                  creation.
-                </small>
-              </div>
-            </div>
-            <PhoneField />
-            <LocationPicker required label="Account location pin" />
-            {accountRole !== "sme" && (
-              <label className="field">
-                {accountRole === "branch"
-                  ? "Branch for this staff account"
-                  : "Driver assigned location"}
-                <select name="branchId" required={accountRole === "branch"}>
-                  <option value="">
-                    {accountRole === "branch"
-                      ? "Choose an open branch"
-                      : "STT Yangon HQ"}
-                  </option>
-                  {data.branches
-                    .filter((b) => b.active !== false)
-                    .map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                </select>
-                <small>
+              <PhoneField />
+              {accountRole !== "sme" && (
+                <label className="field">
                   {accountRole === "branch"
-                    ? "This login can access only the selected branch."
-                    : "HQ drivers serve HQ; branch drivers serve their assigned location."}
-                </small>
-              </label>
-            )}
+                    ? "Branch for this staff account"
+                    : "Driver assigned location"}
+                  <select name="branchId" required={accountRole === "branch"}>
+                    <option value="">
+                      {accountRole === "branch"
+                        ? "Choose an open branch"
+                        : "STT Yangon HQ"}
+                    </option>
+                    {data.branches
+                      .filter((b) => b.active !== false)
+                      .map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                  </select>
+                  <small>
+                    {accountRole === "branch"
+                      ? "This login can access only the selected branch."
+                      : "HQ drivers serve HQ; branch drivers serve their assigned location."}
+                  </small>
+                </label>
+              )}
+            </div>
+            <div className="account-location">
+              <LocationPicker required label="Account location pin" />
+            </div>
             <div className="inline-note">
               The system generates a secure temporary password. It appears once
               with the account ID after creation.
@@ -2381,17 +2463,32 @@ export function Workspace({
         </Modal>
       )}
       {selected && (
-        <Modal title={selected.reference} close={() => setSelected(null)}>
+        <Modal
+          title={selected.reference}
+          close={() => {
+            setSelected(null);
+            if (restoreOrderId)
+              router.replace(workspaceHref(role, section, demo), {
+                scroll: false,
+              });
+          }}
+        >
           <OrderWorkflow
+            paymentInstructions={data.settings?.instructions}
             key={selected.id}
             order={selected}
             viewer={viewer}
             demo={demo}
+            deliveryOrigin={section === "overview" ? "overview" : "deliveries"}
             accounts={data.accounts}
             branches={data.branches}
             query={{ ...query, orderId: selected.id }}
             refresh={() => snapshot.refetch({ throwOnError: true })}
             updated={applySnapshot}
+            onReceiptConfirmed={(message) => {
+              setSelected(null);
+              setToast(message);
+            }}
           />
         </Modal>
       )}
@@ -2447,74 +2544,6 @@ export function Workspace({
           <div className="modal-form">
             <Guide />
           </div>
-        </Modal>
-      )}
-      {modal === "order" && (
-        <Modal title="Review your wholesale order" close={() => setModal(null)}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              createOrder(new FormData(e.currentTarget));
-            }}
-            className="modal-form"
-          >
-            {cart.map((p) => (
-              <div className="quote-line" key={p.id}>
-                <span>
-                  <strong>{p.name}</strong>
-                  <small>
-                    {p.pack} · {p.quantity} × {money(p.price)} MMK
-                  </small>
-                </span>
-                <strong>{money(p.quantity * p.price)} MMK</strong>
-              </div>
-            ))}
-            <dl className="detail-list">
-              <div>
-                <dt>Merchandise</dt>
-                <dd>{money(subtotal)} MMK</dd>
-              </div>
-              <div>
-                <dt>Yangon shipping quote</dt>
-                <dd>
-                  {data.settings?.shipping == null
-                    ? "Awaiting HQ setup"
-                    : `${money(data.settings.shipping)} MMK`}
-                </dd>
-              </div>
-              <div className="total-row">
-                <dt>Full total due upfront</dt>
-                <dd>{money(subtotal + (data.settings?.shipping ?? 0))} MMK</dd>
-              </div>
-            </dl>
-            <label className="field">
-              Receiver name
-              <input name="receiver" required defaultValue={viewer.name} />
-            </label>
-            <PhoneField label="Receiver phone" />
-            <label className="field">
-              Delivery address
-              <textarea
-                name="address"
-                required
-                maxLength={300}
-                defaultValue="Hlaing, Yangon"
-              />
-            </label>
-            <LocationPicker label="Delivery location pin" />
-            <div className="inline-note">
-              Save this quote, then submit full-payment evidence. Stock is
-              reserved only after HQ verifies the actual transfer.
-            </div>
-            {formError && (
-              <p role="alert" className="form-error">
-                {formError}
-              </p>
-            )}
-            <button className="button primary full-width" disabled={pending}>
-              {pending ? "Saving…" : "Save quote & continue"}
-            </button>
-          </form>
         </Modal>
       )}
       {modal === "sale" && (

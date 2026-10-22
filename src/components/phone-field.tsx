@@ -12,9 +12,21 @@ const countries = getCountries()
   .map((code) => ({ code, name: names.of(code) ?? code }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
-export function PhoneField({ label = "Contact number" }: { label?: string }) {
-  const [country, setCountry] = useState<CountryCode>("MM");
-  const [national, setNational] = useState("");
+export function PhoneField({
+  label = "Contact number",
+  initialValue = "",
+  initialCountry = "MM",
+}: {
+  label?: string;
+  initialValue?: string;
+  initialCountry?: string;
+}) {
+  const [country, setCountry] = useState<CountryCode>(
+    () => phoneInputValue(initialValue, initialCountry as CountryCode).country,
+  );
+  const [national, setNational] = useState(
+    () => phoneInputValue(initialValue, initialCountry as CountryCode).national,
+  );
   return (
     <fieldset className="phone-field">
       <legend>{label}</legend>
@@ -42,9 +54,6 @@ export function PhoneField({ label = "Contact number" }: { label?: string }) {
         <label className="field">
           <span className="sr-only">{label}</span>
           <div className="phone-number-input">
-            <span aria-hidden="true" className="phone-prefix">
-              +{getCountryCallingCode(country)}
-            </span>
             <input
               name="phone"
               type="tel"
@@ -65,8 +74,8 @@ export function PhoneField({ label = "Contact number" }: { label?: string }) {
       </div>
       <small>
         {country === "MM"
-          ? "Enter 9… without the leading 0. Saved as +95 9…."
-          : `Country code +${getCountryCallingCode(country)} is already included.`}{" "}
+          ? "Enter your local number; a leading 0 is removed automatically."
+          : "The selected country code is included automatically."}{" "}
         You can also paste a full international number.
       </small>
     </fieldset>

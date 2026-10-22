@@ -5,7 +5,7 @@ do $$
 declare
   hq uuid; buyer uuid:=gen_random_uuid(); other_buyer uuid:=gen_random_uuid(); driver uuid:=gen_random_uuid();
   sku uuid; price numeric; order_id uuid; proof_id uuid; proof_path text; evidence_id uuid;
-  response jsonb; snapshot jsonb; retry uuid:=gen_random_uuid();
+  response jsonb; snapshot jsonb; tracking jsonb; attempt_id uuid; retry uuid:=gen_random_uuid();
 begin
   select id into hq from public.profiles where username='hq.admin' and role='hq' and status='active';
   if hq is null then raise exception 'Bootstrap HQ before this check.'; end if;
@@ -20,6 +20,8 @@ begin
   perform set_config('request.jwt.claim.sub',hq::text,true);
   perform set_config('request.jwt.claims',jsonb_build_object('sub',hq,'role','authenticated')::text,true);
   execute 'set local role authenticated';
+  snapshot:=public.workflow_snapshot('{}'::jsonb);
+  if snapshot is null or not (snapshot ? 'pagination') or not (snapshot ? 'summary') then raise exception 'Paginated HQ workspace failed.'; end if;
   perform public.workflow_execute('configure',jsonb_build_object('shipping',5000,'instructions','ROLLBACK TEST ONLY. No real transfer.'),gen_random_uuid());
   perform public.workflow_execute('stock',jsonb_build_object('productId',sku,'onHand',20,'reason','ROLLBACK TEST ONLY'),gen_random_uuid());
   perform set_config('request.jwt.claim.sub',buyer::text,true);
@@ -51,7 +53,32 @@ begin
   snapshot:=public.workflow_snapshot();
   if jsonb_array_length(snapshot->'orders')<>1 or (snapshot->'orders'->0->>'merchandise')::numeric<>0 or jsonb_array_length(snapshot->'orders'->0->'workflow'->'evidence')<>0 then raise exception 'Driver DTO privacy check failed.'; end if;
   if (select count(*) from public.payment_evidence)<>0 then raise exception 'Driver can read evidence metadata.'; end if;
+  begin
+    perform public.workflow_execute('handover',jsonb_build_object('orderId',order_id),gen_random_uuid());
+    raise exception 'Handover allowed before pickup.';
+  exception when others then
+    if sqlerrm not like 'Confirm pickup before%' then raise; end if;
+  end;
+  retry:=gen_random_uuid();
+  response:=public.workflow_execute('pickup',jsonb_build_object('orderId',order_id),retry);
+  attempt_id:=(response->>'attemptId')::uuid;
+  perform public.workflow_execute('pickup',jsonb_build_object('orderId',order_id),retry);
+  perform public.workflow_tracking_publish(order_id,attempt_id,'sharing',jsonb_build_object('latitude',16.84,'longitude',96.17,'accuracy',12,'capturedAt',clock_timestamp()));
+  tracking:=public.workflow_tracking(order_id);
+  if tracking->'point' is null or tracking->'point'='null'::jsonb or tracking->>'state'<>'sharing' then raise exception 'Synthetic driver location failed.'; end if;
+  perform set_config('request.jwt.claim.sub',other_buyer::text,true);
+  perform set_config('request.jwt.claims',jsonb_build_object('sub',other_buyer,'role','authenticated')::text,true);
+  begin
+    perform public.workflow_tracking(order_id);
+    raise exception 'Other buyer can read driver location.';
+  exception when insufficient_privilege then null;
+  end;
+  if (select count(*) from public.delivery_tracking)<>0 then raise exception 'Tracking RLS leaked a location.'; end if;
+  perform set_config('request.jwt.claim.sub',driver::text,true);
+  perform set_config('request.jwt.claims',jsonb_build_object('sub',driver,'role','authenticated')::text,true);
   perform public.workflow_execute('handover',jsonb_build_object('orderId',order_id),gen_random_uuid());
+  tracking:=public.workflow_tracking(order_id);
+  if tracking->>'state'<>'stopped' or tracking->'point'<>'null'::jsonb then raise exception 'Handover did not clear location.'; end if;
   perform set_config('request.jwt.claim.sub',buyer::text,true);
   perform set_config('request.jwt.claims',jsonb_build_object('sub',buyer,'role','authenticated')::text,true);
   perform public.workflow_execute('receive',jsonb_build_object('orderId',order_id,'fullReceipt',true),gen_random_uuid());
@@ -66,4 +93,4 @@ begin
 end;
 $$;
 rollback;
-select 'PASS: hosted role isolation, private evidence metadata, payment/reservation, dispatch retry, driver handover, two confirmations and one sale; all test records rolled back' as result;
+select 'PASS: paginated HQ workspace, role isolation, private evidence, payment/reservation, dispatch/pickup retry, synthetic GPS, tracking RLS and cleanup, two confirmations and one sale; all test records rolled back' as result;

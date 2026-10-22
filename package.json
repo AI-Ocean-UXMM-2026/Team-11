@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
+    "demo": "node scripts/demo.mjs",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke:workflow": "node scripts/workflow-smoke.mjs",
+    "smoke:routing": "node scripts/routing-smoke.mjs",
     "check:supabase": "node scripts/check-supabase.mjs",
     "bootstrap:hq": "node scripts/bootstrap-hq.mjs",
     "format": "prettier --write src tests docs package.json tsconfig.json next.config.ts",

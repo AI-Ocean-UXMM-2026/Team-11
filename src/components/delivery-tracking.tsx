@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Viewer } from "@/lib/domain";
 import { locationIsFresh } from "@/lib/tracking";
@@ -8,19 +8,57 @@ import {
   subscribeTracking,
   TrackingRequestError,
 } from "@/lib/tracking-client";
-import { LocationMap } from "./location-map";
+import { DeliveryRoute } from "./delivery-route";
 import { useDriverTracking } from "./driver-tracking-provider";
+
+function DeliveryLocationSection({
+  driver,
+  focused,
+  children,
+}: {
+  driver: boolean;
+  focused: boolean;
+  children: ReactNode;
+}) {
+  if (focused)
+    return (
+      <section
+        className="delivery-tracking route-only-tracking"
+        aria-label="Delivery navigation"
+      >
+        {children}
+      </section>
+    );
+  if (driver)
+    return (
+      <details className="workflow-section delivery-tracking" open>
+        <summary>Delivery location</summary>
+        {children}
+      </details>
+    );
+  return (
+    <section
+      className="workflow-section delivery-tracking"
+      aria-label="Delivery tracking"
+    >
+      <h4>Delivery location</h4>
+      {children}
+    </section>
+  );
+}
 
 export function DeliveryTracking({
   orderId,
   viewer,
   demo,
   refresh,
+  focused = false,
 }: {
   orderId: string;
   viewer: Viewer;
   demo: boolean;
   refresh: () => Promise<unknown>;
+  focused?: boolean;
 }) {
   const client = useQueryClient();
   const publisher = useDriverTracking();
@@ -92,34 +130,21 @@ export function DeliveryTracking({
           : live
             ? "Live driver location"
             : "Location temporarily unavailable";
-  const extras = [
-    ...(data.source.pin && (data.point || data.destination)
-      ? [
-          {
-            id: "source",
-            pin: data.source.pin,
-            label: `Collect from ${data.source.name}`,
-            color: "#66756e",
-          },
-        ]
-      : []),
-    ...(data.destination && data.point
-      ? [
-          {
-            id: "destination",
-            pin: data.destination,
-            label: "Delivery destination",
-            color: "#17674f",
-          },
-        ]
-      : []),
-  ];
   return (
-    <section
-      className="workflow-section delivery-tracking"
-      aria-label="Delivery tracking"
+    <DeliveryLocationSection
+      driver={viewer.role === "driver"}
+      focused={focused}
     >
-      <h4>Delivery location</h4>
+      {focused && (
+        <button
+          type="button"
+          className="text-link route-refresh"
+          disabled={query.isFetching}
+          onClick={() => void query.refetch()}
+        >
+          Refresh location
+        </button>
+      )}
       <p
         className={live ? "tracking-status live" : "tracking-status"}
         role="status"
@@ -129,27 +154,38 @@ export function DeliveryTracking({
       <p className="muted">
         Collect from {data.source.name} · Deliver to the saved order location
       </p>
-      {(data.point || data.destination || data.source.pin) && (
-        <LocationMap
-          key={data.attemptId ?? "unassigned"}
-          pin={data.point ?? data.destination ?? data.source.pin ?? undefined}
-          pinLabel={
-            data.point
-              ? "Driver's last reported location"
-              : data.destination
-                ? "Delivery destination"
-                : "Dispatch source"
-          }
-          pinColor={data.point ? "#2868b2" : "#17674f"}
-          markers={extras}
-          label="Delivery tracking"
-        />
+      {!data.point && (
+        <p className="inline-note tracking-location-help">
+          {data.state === "stopped"
+            ? "Location sharing has ended for this delivery. No driver GPS position is available."
+            : !data.pickedUpAt
+              ? viewer.role === "driver"
+                ? "Your blue driver pin appears after you select Confirm pickup & start delivery and allow GPS access. No driver location has been shared for this order yet."
+                : "No driver location has been shared yet. The blue driver pin appears after pickup is confirmed and the driver shares a GPS location."
+              : canResume
+                ? "No driver GPS position has been received yet. Allow location access and keep Supply Link open. If sharing is paused, resume it below."
+                : "No driver GPS position is available for this delivery."}
+        </p>
       )}
-      <p className="tracking-legend">
-        <span>Blue: driver</span>
-        <span>Green: destination</span>
-        <span>Grey: dispatch source, when pinned</span>
-      </p>
+      <DeliveryRoute
+        data={data}
+        viewer={viewer}
+        demo={demo}
+        live={live}
+        now={now}
+        focused={focused}
+      />
+      {(data.point || data.destination || data.source.pin) && (
+        <p className="tracking-legend">
+          {data.point && (
+            <span>
+              Blue: {live ? "driver" : "driver’s last known position"}
+            </span>
+          )}
+          {data.destination && <span>Green: destination</span>}
+          {data.source.pin && <span>Grey: dispatch source</span>}
+        </p>
+      )}
       {data.point && (
         <p className="muted">
           {live ? "Updated" : "Last known position"}:{" "}
@@ -205,7 +241,7 @@ export function DeliveryTracking({
           {publisher.message}
         </p>
       )}
-    </section>
+    </DeliveryLocationSection>
   );
 }
 

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   signOut: vi.fn(),
   single: vi.fn(),
   from: vi.fn(),
+  resolve: vi.fn(),
 }));
 vi.mock("../src/lib/supabase/server", () => ({
   createClient: async () => ({
@@ -13,8 +14,12 @@ vi.mock("../src/lib/supabase/server", () => ({
   }),
 }));
 vi.mock("../src/lib/supabase/config", () => ({ isDemoMode: () => false }));
+vi.mock("../src/lib/auth/login-identity", () => ({
+  resolveLoginUsername: mocks.resolve,
+}));
 import { authenticatePortal } from "../src/lib/auth/login";
 beforeEach(() => {
+  mocks.resolve.mockReset().mockImplementation(async (_portal, value) => value);
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://test.supabase.co");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "test-public-key");
   mocks.signIn
@@ -78,6 +83,29 @@ describe("live portal authorisation", () => {
         })
       ).redirectTo,
     ).toBe("/change-password?portal=driver");
+  });
+  it("resolves a full name privately before checking its password", async () => {
+    mocks.resolve.mockResolvedValue("issued-uuid");
+    expect(
+      await authenticatePortal("sme", {
+        username: "Mya Thida Shoe Store",
+        password: "test-password",
+      }),
+    ).toEqual({ status: 200, redirectTo: "/sme" });
+    expect(mocks.resolve).toHaveBeenCalledWith("sme", "mya thida shoe store");
+    expect(mocks.signIn).toHaveBeenCalledWith({
+      email: "issued-uuid@login.supplylink.invalid",
+      password: "test-password",
+    });
+  });
+  it("rejects ambiguous names without creating a session", async () => {
+    mocks.resolve.mockResolvedValue(null);
+    const result = await authenticatePortal("sme", {
+      username: "Shared Name",
+      password: "test-password",
+    });
+    expect(result.status).toBe(401);
+    expect(mocks.signIn).not.toHaveBeenCalled();
   });
   it("rejects malformed IDs before contacting Auth", async () => {
     expect(

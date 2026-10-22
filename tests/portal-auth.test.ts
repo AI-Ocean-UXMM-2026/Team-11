@@ -42,6 +42,45 @@ describe("HQ-issued portal credentials", () => {
       directory.authenticate("sme", "myathida", DEMO_PASSWORD).user?.role,
     ).toBe("sme");
   });
+  it("accepts case-insensitive full names only in their own portal", () => {
+    expect(
+      directory.authenticate("sme", "  MYA THIDA SHOE STORE  ", DEMO_PASSWORD)
+        .user?.username,
+    ).toBe("myathida");
+    expect(
+      directory.authenticate("driver", "Mya Thida Shoe Store", DEMO_PASSWORD)
+        .status,
+    ).toBe(401);
+    expect(
+      directory.authenticate("sme", "Mya Thida Shoe Store", "wrong").status,
+    ).toBe(401);
+  });
+  it("requires an ID for duplicate names and shares the ID/name attempt limit", () => {
+    const hq = directory.authenticate("hq", "hq.admin", DEMO_PASSWORD);
+    const first = directory.provision(hq.token, input);
+    expect(
+      directory.authenticate("sme", input.name, first.temporaryPassword!)
+        .status,
+    ).toBe(200);
+    directory.provision(hq.token, input);
+    expect(
+      directory.authenticate("sme", input.name, first.temporaryPassword!)
+        .status,
+    ).toBe(401);
+    expect(
+      directory.authenticate("sme", first.username!, first.temporaryPassword!)
+        .status,
+    ).toBe(200);
+    for (let i = 0; i < 8; i++)
+      directory.authenticate(
+        "sme",
+        i % 2 ? "myathida" : "Mya Thida Shoe Store",
+        "wrong",
+      );
+    expect(
+      directory.authenticate("sme", "myathida", DEMO_PASSWORD).status,
+    ).toBe(429);
+  });
   it("only lets signed-in HQ create accounts and rejects elevated roles", () => {
     expect(directory.provision(undefined, input).error).toBeTruthy();
     const sme = directory.authenticate("sme", "myathida", DEMO_PASSWORD);

@@ -9,10 +9,12 @@ import {
   workflowSnapshot,
 } from "./workflow/server";
 import type { Role } from "./domain";
+import type { WorkspaceQuery } from "./workflow/query";
 
 export async function loadWorkspace(
   _requestedRole?: string,
   requiredRole?: Role,
+  query?: WorkspaceQuery,
 ) {
   if (isDemoMode()) {
     const session = await getDemoSession();
@@ -32,7 +34,7 @@ export async function loadWorkspace(
   if (!viewer) redirect(portalLogin(requiredRole ?? "hq"));
   if (requiredRole && viewer.role !== requiredRole)
     redirect(portalHome(viewer.role));
-  const data = await workflowSnapshot(viewer);
+  const data = await workflowSnapshot(viewer, query);
   if (viewer.role === "branch") viewer.branchId = data.branches[0]?.id;
   return { data, viewer, demo: isDemoMode() };
 }

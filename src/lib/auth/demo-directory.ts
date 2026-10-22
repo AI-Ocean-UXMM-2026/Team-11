@@ -82,7 +82,15 @@ export class DemoDirectory {
     username: string,
     password: string,
   ): { status: number; error?: string; token?: string; user?: DemoUser } {
-    const key = `${portal}:${username}`;
+    const identifier = username.trim().toLowerCase();
+    const byId = this.users.get(identifier);
+    const names = byId
+      ? []
+      : [...this.users.values()].filter(
+          (u) => u.role === portal && u.name.toLowerCase() === identifier,
+        );
+    const user = byId ?? (names.length === 1 ? names[0] : undefined);
+    const key = `${portal}:${user?.username ?? identifier}`;
     const now = Date.now();
     const attempts = this.failures.get(key);
     if (attempts && attempts.expires > now && attempts.count >= 8)
@@ -90,7 +98,6 @@ export class DemoDirectory {
         status: 429,
         error: "Too many attempts. Try again in 15 minutes.",
       };
-    const user = this.users.get(username);
     // Always derive a hash to avoid a cheap account-existence timing signal.
     const hash = scryptSync(password, user?.salt ?? "missing-account-salt", 64);
     const valid =
@@ -111,7 +118,7 @@ export class DemoDirectory {
       return {
         status: 401,
         error:
-          "These credentials do not match an active account in this portal. Contact HQ if you need access.",
+          "These credentials do not match an active account in this portal. If your name is shared, use your account ID.",
       };
     }
     this.failures.delete(key);

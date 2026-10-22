@@ -52,7 +52,8 @@ validation. Read-only previews never alter the saved coordinates.
 ## Future tracking
 
 This change selects the map provider and replaces the pin UI. Foreground pickup tracking is implemented in [driver tracking](driver-tracking.md).
-Routing, ETA and background location collection remain separate work. Mapbox GL JS displays updates; it does not
+Road routing and estimated travel time are implemented in [live routing](live-routing.md).
+Background location collection remains later work. Mapbox GL JS displays updates; it does not
 automatically collect or broadcast drivers' positions.
 
 Automated UI tests mock the Mapbox SDK to verify coordinate conversion, clicking,

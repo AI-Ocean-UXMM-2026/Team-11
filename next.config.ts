@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
+  distDir: process.env.SUPPLYLINK_BUILD_DIR || ".next",
   poweredByHeader: false,
   serverExternalPackages: ["@electric-sql/pglite", "sharp"],
   async headers() {

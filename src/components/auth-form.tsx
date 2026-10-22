@@ -84,31 +84,34 @@ function PortalLoginForm({
             ? "Your assigned deliveries and handovers, in one place."
             : portal === "branch"
               ? "Your branch stock, refills, retail sales and assigned deliveries."
-            : "Manage your STT stock, branches and business accounts."}
+              : "Manage your STT stock, branches and business accounts."}
       </p>
       <div className="auth-issued-note">
         <ShieldCheck size={17} aria-hidden="true" />
         <span>
           {portal === "hq"
             ? "Use your authorised headquarters account."
-            : "Use the account ID and temporary password provided by HQ. There is no public sign-up."}
+            : "Use your account ID or full name and the password provided by HQ. There is no public sign-up."}
         </span>
       </div>
       <label className="field">
-        Account ID
+        Account ID or name
         <input
           name="username"
           required
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
-          maxLength={40}
+          maxLength={100}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          placeholder="Your HQ-issued account ID"
+          placeholder="Account ID or full name"
           aria-describedby={error ? "login-error" : undefined}
         />
       </label>
+      <small>
+        Use your full name as saved by HQ. If it is shared, use your account ID.
+      </small>
       <label className="field">
         Password
         <span className="password-input">

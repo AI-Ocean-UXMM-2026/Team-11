@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { demoDirectory } from "../auth/demo-directory";
+import { seedDemoShowcase } from "./demo-showcase";
 
 export function localIdentity(id: string) {
   if (/^[0-9a-f-]{36}$/i.test(id)) return id;
@@ -26,6 +27,7 @@ export const supabaseStubs = `
 const runtime = globalThis as typeof globalThis & {
   workflowDb?: Promise<PGlite>;
   workflowQueue?: Promise<unknown>;
+  workflowShowcaseEligible?: boolean;
 };
 const migrated = new WeakSet<PGlite>();
 // The database survives Next.js hot reload; the migration list may be newer.
@@ -43,6 +45,7 @@ async function applyMigrations(db: PGlite) {
     "20261021083626_account_locations_order_ids.sql",
     "20261021092923_branch_location_pins.sql",
     "20261021104603_driver_pickup_tracking.sql",
+    "20261021140016_branch_transfer_history.sql",
   ]) {
     const done = await db.query(
       "select 1 from public.workflow_migrations where name=$1",
@@ -70,6 +73,7 @@ async function initialize() {
     "select to_regclass('public.workflow_migrations')::text as present",
   );
   if (!rows[0].present) {
+    runtime.workflowShowcaseEligible = true;
     await db.exec(supabaseStubs);
     await db.exec(
       "create table public.workflow_migrations(name text primary key)",
@@ -100,7 +104,7 @@ export async function localRequest<T>(
     .then(async () => {
       const db = await (runtime.workflowDb ??= initialize());
       await applyMigrations(db);
-      return db.transaction(async (tx) => {
+      const result = await db.transaction(async (tx) => {
         const branch = await tx.query<{ id: string }>(
           "select id from public.branches where name='Hlaing branch' limit 1",
         );
@@ -153,12 +157,16 @@ export async function localRequest<T>(
             ],
           );
         }
+        if (runtime.workflowShowcaseEligible)
+          await seedDemoShowcase(tx, localRoot());
         await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [
           localIdentity(actorId),
         ]);
         await tx.exec("set local role authenticated");
         return action(tx);
       });
+      runtime.workflowShowcaseEligible = false;
+      return result;
     });
   runtime.workflowQueue = request;
   return request;

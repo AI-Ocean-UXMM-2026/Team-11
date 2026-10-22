@@ -19,8 +19,6 @@ export async function signIn(_previous: { error: string }, form: FormData) {
     return { error: "Choose a valid portal." };
   const username = String(form.get("username") ?? "");
   const password = String(form.get("password") ?? "");
-  if (!/^[a-z0-9][a-z0-9._-]{2,39}$/i.test(username) || !password)
-    return { error: "Enter your HQ-issued account ID and password." };
   const result = await authenticatePortal(portal, { username, password });
   if (result.error) return { error: result.error };
   redirect(result.redirectTo!);

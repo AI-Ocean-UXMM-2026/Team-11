@@ -292,6 +292,7 @@ export function canAccess(role: Role, section: string) {
       "orders",
       "inventory",
       "branches",
+      "drivers",
       "accounts",
       "reports",
       "settings",

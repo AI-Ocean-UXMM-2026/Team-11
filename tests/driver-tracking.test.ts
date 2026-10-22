@@ -116,6 +116,34 @@ beforeAll(async () => {
 }, 30000);
 afterAll(() => db.close());
 
+it("allows HQ to assign two active orders to the same driver and lists both jobs", async () => {
+  const orderIds = [randomUUID(), randomUUID()];
+  for (const orderId of orderIds) {
+    await db.query(
+      "insert into public.orders(id,reference,sme_id,business_name,destination,receiver_name,receiver_phone,item_count,merchandise_total,shipping_total,status,payment_verified_at,reserved_at,latitude,longitude) values($1,$2,$3,'Multi-order shop','Delivery pin','Receiver','+959123456789',2,10000,1000,'Confirmed',now(),now(),16.85,96.18)",
+      [orderId, `MULTI-${orderId}`, ids.sme],
+    );
+    await as(
+      "hq",
+      "select public.workflow_execute('assign',jsonb_build_object('orderId',$1::text,'driverId',$2::text),$3::uuid)",
+      [orderId, ids.driver, randomUUID()],
+    );
+  }
+  const attempts = await db.query<{ order_id: string; driver_id: string }>(
+    "select order_id,driver_id from public.delivery_attempts where order_id=any($1::uuid[]) and active",
+    [orderIds],
+  );
+  expect(attempts.rows).toHaveLength(2);
+  expect(attempts.rows.every((row) => row.driver_id === ids.driver)).toBe(true);
+  const jobs = (
+    await as<{ r: { rows: { id: string }[] } }>(
+      "driver",
+      "select public.workflow_list('orders','{}'::jsonb) r",
+    )
+  )[0].r.rows;
+  expect(jobs.map((job) => job.id)).toEqual(expect.arrayContaining(orderIds));
+});
+
 it("requires assigned-driver pickup after dispatch and records a retry only once", async () => {
   const { orderId, attemptId } = await delivery();
   await expect(action("hq", "pickup", orderId)).rejects.toThrow(

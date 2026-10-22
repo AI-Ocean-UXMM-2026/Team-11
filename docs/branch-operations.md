@@ -2,6 +2,49 @@
 
 HQ creates each location in **Branches**, then issues a **Branch staff** account for that location in **Accounts & access**. Staff sign in at `/branch/login` using the HQ-issued account ID and temporary password. First sign-in requires a password change. Each branch sees its own stock, retail sales, transfers, affiliated drivers and deliveries; payment evidence and wholesale monetary values are hidden.
 
+## Manage one branch
+
+HQ selects **Manage branch** on a network card to open `/branches/<branchId>`.
+The dedicated page shows that branch’s information and location, stock by SKU,
+assigned drivers and **Stock refillment history**. The network no longer opens
+branch details inline. The network shows branch cards and creation controls; stock movement history appears on the individual branch page. Back to branches returns to the network.
+
+**Refill stock** opens a dialog with the destination fixed to the selected branch,
+a shoe variant, whole-pair quantity and reason. Available source stock is shown.
+Submitting reserves a transfer; HQ confirms dispatch in history, then branch staff
+confirm physical receipt in their own portal. Stock increases only on receipt.
+The same dialog retains a return-to-HQ option. Edit branch, driver affiliation
+and guarded closure remain available from the detail page.
+
+The history endpoint `/api/branches/<branchId>/transfers` uses TanStack Query and
+server pagination (25/50/100). It includes only that branch’s refills and returns,
+with full branch-specific totals and pending counts. New transfers and updates
+invalidate the branch history cache. Authentication, completed password setup and
+HQ access are checked in the app and the database. The exposed history RPC uses
+an invoker wrapper around a checked function in the non-exposed private schema;
+anonymous and non-HQ reads are rejected.
+
+Migration `20261021140016_branch_transfer_history.sql` is applied to hosted Supply
+Link and is included in the local demo’s automatic migrations. It adds read-only
+history functions and changes no existing stock, accounts or transfer records.
+
+Verification: 129 tests across 28 files, TypeScript and the production build passed.
+Database coverage includes 32 branch transfers over multiple pages, unrelated
+branches, empty/closed branches, invalid pages and direct RPC access denial.
+Browser verification followed Manage branch into the separate page, reserved six
+pairs in the isolated demo, and confirmed the refreshed history. An HTTP check
+then dispatched and received that refill; branch stock rose from 150 to 156 only
+on receipt. Guest and branch-user access to the HQ history endpoint was denied.
+Mobile 375×812 had no horizontal document overflow; primary branch actions are
+44px tall. Hosted HQ history readback passed in a rolled-back transaction, and
+the security-advisor result was unchanged by this migration.
+
+Screenshots: [branch page](screenshots/branch-detail-desktop.png),
+[refill dialog](screenshots/branch-refill-dialog.png),
+[mobile refill](screenshots/branch-refill-mobile.png). All show local demo data.
+
+## Driver affiliation
+
 Drivers belong to HQ or one open branch. HQ manages affiliation in **Branches**. Resolve a driver's active assignments before moving them. A location can assign only its own active drivers.
 
 HQ branch creation and editing use the same map picker as account creation.

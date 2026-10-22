@@ -39,8 +39,27 @@ The map shows the destination, driver position and dispatch source when its pin
 is available, plus accuracy and capture time in Yangon time. HQ has no configured
 dispatch pin yet, so its source is shown by name. A fix becomes stale after 60
 seconds; a disconnected live subscription also prevents a “live” label. There
-are no inferred routes, arrival-based status changes or precise ETA estimates.
+are no arrival-based status changes or guaranteed ETA estimates. Road routing,
+estimated travel time and the focused driver view are described in
+[live routing](live-routing.md).
 Driver handover, SME receipt and HQ completion retain their separate meanings.
+
+The driver order dialog contains order details and delivery actions, with an
+**Open delivery view** link instead of an embedded Delivery location section.
+The focused page contains only navigation and location-sharing information;
+**Back to order** reopens the same order dialog. Order activity is hidden from
+drivers. Moving between these views does not pause the GPS publisher or its
+subscription. The legend lists only markers that have actual
+coordinates: blue for a received driver fix, green for the destination and grey
+for the dispatch source. Stale/disconnected fixes are labelled last known.
+Before pickup, an explanation states that the blue pin requires confirmed pickup
+and GPS permission; after pickup without a fix, it explains that GPS has not been
+received. The app never substitutes a destination or account pin for driver GPS.
+When fitting multiple pins, the camera reserves space for the built-in zoom and
+fullscreen controls so an edge pin does not sit underneath them. Driver updates
+frame all locations together when needed, rather than overriding the bounds with
+a second camera jump. The map reframes after loading, resizing or reopening its
+view.
 
 ## Transport and rollout
 
@@ -73,3 +92,11 @@ handover, replacement and suspension. Browser simulations cover explicit pickup,
 navigation, visibility, permission denial, throttling and watch cleanup. These
 tests use synthetic positions and mock browser GPS; they do not collect anyone's
 real location or prove phone/background reliability.
+
+Driver-map UI verification: 13 targeted tracking/provider/map tests passed,
+including pickup/GPS explanations, dynamic legends, collapse/reopen without
+publisher changes, marker colors and camera framing without a competing jump.
+The production demo build passed. Browser checks with existing synthetic GPS
+data verified both blue and green marker rectangles stay inside the map and
+clear of its controls. Screenshots: `screenshots/driver-location-expanded.png`
+and `screenshots/driver-location-collapsed.png`.

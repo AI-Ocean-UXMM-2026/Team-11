@@ -7,6 +7,7 @@ import { loginSchema, portalHome, type LoginPortal } from "../portals";
 import { demoDirectory } from "./demo-directory";
 import { DEMO_COOKIE } from "./session";
 import { localRequest } from "../workflow/local";
+import { resolveLoginUsername } from "./login-identity";
 
 export async function authenticatePortal(
   portal: LoginPortal,
@@ -16,7 +17,7 @@ export async function authenticatePortal(
   if (!parsed.success)
     return {
       status: 400,
-      error: "Enter your HQ-issued account ID and password.",
+      error: "Enter your account ID or name and password.",
     };
   const { username, password } = parsed.data;
   if (isDemoMode()) {
@@ -64,16 +65,23 @@ export async function authenticatePortal(
       status: 503,
       error: "Supabase is not configured. Contact HQ to connect the workspace.",
     };
+  const resolvedUsername = await resolveLoginUsername(portal, username);
+  if (!resolvedUsername)
+    return {
+      status: 401,
+      error:
+        "These credentials do not match an active account in this portal. If your name is shared, use your account ID.",
+    };
   const db = await createClient();
   const { data, error } = await db.auth.signInWithPassword({
-    email: loginEmail(username),
+    email: loginEmail(resolvedUsername),
     password,
   });
   if (error || !data.user)
     return {
       status: 401,
       error:
-        "These credentials do not match an active account in this portal. Contact HQ if you need access.",
+        "These credentials do not match an active account in this portal. If your name is shared, use your account ID.",
     };
   const { data: profile, error: profileError } = await db
     .from("profiles")
@@ -90,7 +98,7 @@ export async function authenticatePortal(
     return {
       status: 403,
       error:
-        "These credentials do not match an active account in this portal. Contact HQ if you need access.",
+        "These credentials do not match an active account in this portal. If your name is shared, use your account ID.",
     };
   }
   return {

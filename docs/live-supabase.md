@@ -21,9 +21,9 @@ The bootstrap script refuses to rotate or replace an existing HQ account. It is 
 
 ## Database deployment
 
-The pagination update adds `20261021060000_workspace_pagination.sql` and `20261021060001_branch_sales_totals.sql`. The account/location update additionally requires `20261021083626_account_locations_order_ids.sql`. Branch map pickers additionally require `20261021092923_branch_location_pins.sql`. Apply all four before running this app version in hosted mode; these hosted deployments have not been verified here. The local demo applies them automatically. See [pagination and rollout](pagination.md).
+On 21 October 2026, the hosted database was still at the branch-operations migration while the app at commit `de4b3c4` required pagination, account/location pins and driver pickup/tracking. This caused the workspace load error after successful sign-in: `workflow_snapshot(p_query jsonb)` did not exist. The five pending committed migrations were applied in order, and the PostgREST schema cache was reloaded. No sample business records were imported.
 
-All five migrations are applied. Remote migration-history versions match the repository filenames, so a later CLI deployment can recognize them as applied:
+All eleven current migrations are applied. Remote migration-history versions match the repository filenames, so a later CLI deployment can recognize them as applied:
 
 | Version          | Migration                                                                    |
 | ---------------- | ---------------------------------------------------------------------------- |
@@ -32,26 +32,43 @@ All five migrations are applied. Remote migration-history versions match the rep
 | `202610210003`   | Transactional ordering, payment, stock, retail and delivery                  |
 | `202610210004`   | Completed driver history and branch stock summary                            |
 | `20261021045326` | Branch management, stock transfers, driver affiliation and delivery handoffs |
+| `20261021060000` | Paginated workspace histories and reporting aggregates                       |
+| `20261021060001` | Branch sales totals independent of history pagination                        |
+| `20261021083626` | Account/order location pins and UUID order references                        |
+| `20261021092923` | Branch location pins and updated workspace snapshot                          |
+| `20261021104603` | Driver pickup confirmation and protected foreground tracking                 |
+| `20261021140016` | HQ-only paginated transfer history for branch detail pages                   |
 
 The branch UI was initially available before its hosted migration, causing branch creation to reach the previous order handler and report **Order not found**. Applying the fifth migration resolved that mismatch. [Branch verification](../tests/hosted-branches.sql) confirms authenticated HQ creation, retry safety, six empty stock rows, branch isolation and physical refill receipt. All test fixtures are rolled back.
 
 ## Verification
 
 - Auth Admin and publishable-key access verified without printing keys.
-- All 20 application tables have RLS enabled. Anonymous workflow and order access is denied; reservation/completion helpers and the private core workflow cannot be executed directly by authenticated clients.
+- All 21 application tables have RLS enabled. Anonymous workflow and order access is denied; reservation/completion helpers and the private core workflow cannot be executed directly by authenticated clients.
 - A real private Storage upload/download succeeded, anonymous upload/download was denied, and the disposable probe was removed.
-- [Hosted workflow check](../tests/hosted-workflow.sql) passed for quote idempotency, SME isolation, private payment metadata, full payment/stock reservation, assigned driver privacy, dispatch replay, handover, two-party completion and one sales event. All fixtures were rolled back. It left zero orders, sales and payment records.
+- [Hosted workflow check](../tests/hosted-workflow.sql) passed after all ten migrations for paginated HQ loading, quote idempotency, SME isolation, private payment metadata, payment/stock reservation, assigned driver privacy, dispatch and pickup replay, synthetic GPS publishing, tracking RLS and location cleanup, handover, two-party completion and one sales event. Every fixture and temporary stock/configuration change was rolled back; existing business records were preserved.
+- The actual active `hq.admin` profile, with its password-change requirement already completed, loads the paginated snapshot successfully without bypassing that guard. The six STT variants are present.
+- `delivery_tracking` is included in the hosted `supabase_realtime` publication. This confirms database publication setup; a live hosted subscription and real-phone GPS over HTTPS still need a separate walkthrough. SQL verification uses synthetic coordinates only.
 - Initial HQ sign-in is checked through the app's cookie login endpoint. Direct workspace access redirects to password change; operational API access is forbidden before setup. The test does not change the owner's password.
-- 52 automated tests, TypeScript and the production build pass after the branch update. The hosted core ordering regression also passes after the new workflow wrapper is installed.
+- The commit's local verification reported 96 tests, TypeScript and the production build passing. This rollout changed no application source or migration contents; its verification was performed against hosted Supabase.
 
 `npm run check:supabase` checks Auth/Storage with a disposable probe. `node scripts/check-hq-login.mjs` is only for checking the initial temporary login before the owner changes it. `npm run smoke:workflow` remains **local-demo-only** and refuses hosted mode.
 
 ## Advisor review
 
-No security ERROR findings were returned. Four [authenticated SECURITY DEFINER warnings](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable) are intentional: role/branch helpers return the caller's own active profile context, and the two public workflow RPCs perform explicit identity, status, role, ownership and order-state checks with a fixed empty search path. Internal reservation/completion helpers are revoked from clients.
+No security ERROR findings were returned after rollout. Eight [authenticated SECURITY DEFINER warnings](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable) cover the intended role/branch helpers and public workflow/list/snapshot/tracking RPCs. These check identity, account status, role, ownership and applicable order state with a fixed empty search path. Private operational helpers remain revoked from clients; the private tracking permission helper is granted only for its RLS predicate.
 
 Eight [RLS-without-policy INFO notices](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy) are intentional for internal tables with no direct authenticated grants. Access goes through the checked workflow RPCs. Do not add permissive policies to silence these notices.
 
 The latest review also reports [leaked password protection disabled](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). Enable it in Supabase Auth password settings if supported by the project's plan; the connector cannot change this setting.
 
-Performance review reported [18 unindexed foreign keys](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys) and [unused indexes](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index) in this newly empty workspace. These are recorded for query-driven optimization as real data grows. The existing primary keys and operational order/branch/time indexes remain in place.
+Performance review reported [21 unindexed foreign keys](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys) and 12 [unused indexes](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index). These are recorded for query-driven optimization as real data grows. The existing primary keys and operational order/branch/time indexes remain in place.
+
+## Branch detail rollout
+
+On 21 October 2026 the additive branch-history migration was applied for the
+new HQ `/branches/<branchId>` page. Its hosted migration version matches the local
+file. HQ readback returned the existing branch history inside a rolled-back
+transaction. The migration adds checked read-only functions; existing business
+records were not changed. The security advisor reported the same findings as
+before the migration. UI refill verification ran only in the separate local demo.

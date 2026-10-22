@@ -4,6 +4,14 @@
 SMEs and Drivers now have dedicated sign-in pages using HQ-issued credentials. See the
 [portal endpoints and demo credential walkthrough](docs/stt-portals.md).
 
+The SME catalog now uses product cards and a guided cart, shop information, order review and payment-evidence checkout. HQ delivery holds appear first on the overview. Run `npm run demo` for an isolated, populated preview on port 3100. See [catalog, checkout and demo credentials](docs/catalog-checkout.md).
+
+Live delivery routing now includes a focused driver view, Mapbox road directions,
+remaining distance, estimated drive time/arrival, follow/recenter and off-route
+rerouting. HQ and the ordering SME can view the route. See
+[live routing and setup](docs/live-routing.md). With the isolated demo running,
+`npm run smoke:routing` verifies real Directions geometry using synthetic GPS.
+
 A supplier management and wholesale ordering platform connecting SMEs with a supplier's headquarters, retail branches, and delivery drivers.
 
 **Project status:** Next.js + Supabase baseline and phase 2 order workflow implemented. The requirements below describe the intended full MVP; they are not all implemented. The newer [PRD](PRD_Driver_Registration_and_Live_Tracking.md) is the source of truth for HQ-managed accounts and full upfront payments.

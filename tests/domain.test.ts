@@ -27,6 +27,9 @@ describe("business boundaries", () => {
     expect(canAccess("driver", "reports")).toBe(false);
     expect(canAccess("branch", "orders")).toBe(false);
     expect(canAccess("hq", "accounts")).toBe(true);
+    expect(canAccess("hq", "drivers")).toBe(true);
+    for (const role of ["sme", "branch", "driver"] as const)
+      expect(canAccess(role, "drivers")).toBe(false);
   });
   it("scopes demo records by role", () => {
     expect(demoForRole("sme").orders.every((o) => o.initials === "MT")).toBe(

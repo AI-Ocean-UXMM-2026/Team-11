@@ -15,6 +15,7 @@ export default async function Page({
       "orders",
       "inventory",
       "branches",
+      "drivers",
       "accounts",
       "reports",
       "settings",

@@ -9,8 +9,12 @@ password changes remain mandatory. Temporary passwords use 18 cryptographically 
 
 The country selector defaults to Myanmar (+95) and supports all countries in
 `libphonenumber-js`. National numbers and full international numbers are
-validated and saved in E.164 format. The input shows the calling code separately; Myanmar entry strips a leading zero, so `09…` becomes `+95 9…`. Selecting a country does not prepend its
+validated and saved in E.164 format. The country selector shows the calling code once; Myanmar entry strips a leading zero, so `09…` becomes `+95 9…`. Selecting a country does not prepend its
 code a second time to an already international number.
+
+The creation form omits the generated-ID placeholder. The one-time credentials handoff still shows the actual ID and temporary password.
+
+All portals accept an Account ID or the full name/business name saved by HQ, plus the password. Name matching is exact and case-insensitive within that portal. Duplicate names require the Account ID. IDs take precedence over matching names. Live name resolution runs only on the server using `SUPABASE_SERVICE_ROLE_KEY`; it never exposes a profile-search endpoint or bypasses Supabase password, role or active-status checks. Existing ID sign-in remains available without the provisioning key.
 
 New accounts require a location pin. The account form has no address, latitude,
 longitude or password input. Click the Mapbox map, drag the marker, use the
@@ -39,3 +43,12 @@ applies it automatically.
 The local demo retains its account and session maps through Next.js hot reload,
 while refreshing the directory methods so removed form fields do not remain
 required by an old cached handler.
+
+The desktop account dialog puts the identity/contact fields beside the location
+picker. The driver form, including assignment and submit controls, fits at
+1280×720; small windows and mobile retain scrolling. The country dropdown is the
+only visible dialing-code prefix. Screenshot: `screenshots/account-create-desktop.png`.
+
+Verification for name sign-in: 111 tests across 24 files, TypeScript and the demo
+production build passed. Browser sample SME and HQ sign-ins by full name worked;
+a read-only hosted SDK lookup verified ID precedence and the HQ exact-name query.

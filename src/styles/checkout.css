@@ -1,0 +1,1032 @@
+.sme-checkout {
+  margin-top: 24px;
+}
+.checkout-steps {
+  display: flex;
+  padding: 0 0 24px;
+  margin: 0 0 28px;
+  list-style: none;
+  border-bottom: 1px solid var(--border);
+  gap: 32px;
+}
+.checkout-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.checkout-steps li > span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: white;
+}
+.checkout-steps .current {
+  color: var(--forest);
+}
+.checkout-steps .current > span,
+.checkout-steps .complete > span {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: white;
+}
+.sneaker-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+.sneaker-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.sneaker-photo {
+  position: relative;
+  background: #f0f2ef;
+  aspect-ratio: 4 / 3;
+}
+.sneaker-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sneaker-color {
+  position: absolute;
+  left: 20px;
+  bottom: 18px;
+  padding: 6px 13px;
+  border-radius: 20px;
+  background: white;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.sneaker-card-body {
+  padding: 25px 28px 16px;
+}
+.sneaker-card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.sneaker-card-heading p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 5px;
+}
+.sneaker-card-heading h2 {
+  font-size: 24px;
+  letter-spacing: -0.6px;
+  margin: 0;
+}
+.sneaker-card-heading > .swatch {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  border: 1px solid #bfc8bd;
+  flex-shrink: 0;
+}
+.sneaker-description {
+  max-width: 45ch;
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 15px 0;
+}
+.sneaker-unit-price {
+  color: var(--ink);
+  font-size: 13px;
+  margin: 0 0 24px;
+}
+.sneaker-unit-price strong {
+  font-size: 23px;
+  font-weight: 700;
+}
+.sneaker-unit-price > span {
+  color: var(--muted);
+}
+.sneaker-card .variant-field {
+  margin: 18px 0;
+}
+.sneaker-card .size-options > button {
+  min-width: 48px;
+  min-height: 44px;
+}
+.sneaker-add-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 20px;
+}
+.sneaker-add-controls > .field {
+  width: 90px;
+  flex-shrink: 0;
+  margin: 0;
+}
+.sneaker-add-controls .button {
+  flex: 1;
+  min-height: 48px;
+  justify-content: center;
+}
+.sneaker-stock {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 13px 0 0;
+}
+.sneaker-added {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  font-size: 12px;
+  color: var(--green);
+}
+.catalog-cart-bar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 8;
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px;
+  border: 1px solid #bfd2c4;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px #183d2912;
+}
+.catalog-cart-bar > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.catalog-cart-bar strong,
+.catalog-cart-bar small {
+  display: block;
+}
+.catalog-cart-bar small {
+  margin-top: 4px;
+  color: var(--muted);
+}
+.catalog-cart-bar .button {
+  min-width: 165px;
+}
+.checkout-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 0 24px;
+}
+.checkout-heading p {
+  margin: 0 0 5px;
+  color: var(--muted);
+}
+.checkout-heading h2 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.7px;
+}
+.checkout-substeps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin-bottom: 28px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.checkout-substeps .current {
+  color: var(--forest);
+  font-weight: 700;
+  border-bottom: 2px solid var(--green);
+  padding-bottom: 8px;
+}
+.checkout-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 28px;
+  align-items: start;
+}
+.checkout-columns > * {
+  min-width: 0;
+}
+.checkout-summary {
+  padding: 26px;
+  border-radius: 12px;
+  background: #f0f5ee;
+  border: 1px solid #e0e8dc;
+}
+.checkout-summary h3 {
+  margin: 0 0 20px;
+  font-size: 18px;
+}
+.checkout-summary dl {
+  margin: 0;
+}
+.checkout-summary dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 14px 0;
+  font-size: 13px;
+}
+.checkout-summary dd {
+  text-align: right;
+  margin: 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.checkout-summary .checkout-total {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #d5dfd0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.checkout-summary p {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #52634e;
+  margin: 22px 0 0;
+}
+.checkout-summary p svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.checkout-summary + .button {
+  margin-top: 16px;
+  min-height: 50px;
+  justify-content: center;
+}
+.checkout-cart-list {
+  border-top: 1px solid var(--border);
+}
+.checkout-cart-item {
+  display: grid;
+  grid-template-columns: 135px minmax(0, 1fr) auto;
+  gap: 20px;
+  padding: 25px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: start;
+}
+.checkout-cart-item > img {
+  width: 135px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #f1f3f0;
+}
+.checkout-cart-item > strong {
+  font-size: 14px;
+  white-space: nowrap;
+}
+.checkout-cart-description h3 {
+  margin: 0 0 5px;
+  font-size: 15px;
+}
+.checkout-cart-description p {
+  margin: 4px 0;
+}
+.checkout-cart-description small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.cart-item-actions {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-top: 15px;
+}
+.cart-item-actions label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+}
+.cart-item-actions input {
+  width: 70px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5c7;
+  border-radius: 6px;
+}
+.cart-item-actions button {
+  min-height: 44px;
+}
+.checkout-stock-note {
+  color: var(--muted);
+  line-height: 1.75;
+  font-size: 13px;
+  margin: 20px 0;
+  max-width: 70ch;
+}
+.checkout-shop-form,
+.checkout-evidence-form {
+  padding: 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+}
+.checkout-shop-form > *,
+.checkout-evidence-form > * {
+  min-width: 0;
+}
+.checkout-evidence-form input[type="file"] {
+  max-width: 100%;
+}
+.checkout-shop-form h3,
+.checkout-evidence-form h3 {
+  font-size: 19px;
+  margin: 0;
+}
+.checkout-shop-form > p,
+.checkout-evidence-form > p {
+  margin: 0;
+}
+.checkout-shop-form .field,
+.checkout-evidence-form .field {
+  margin: 0;
+}
+.checkout-shop-form .button,
+.checkout-evidence-form .button {
+  justify-self: start;
+}
+.checkout-shop-form .location-map {
+  max-height: 290px;
+}
+.checkout-review-shop {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px;
+  margin-bottom: 25px;
+}
+.checkout-review-shop > div {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.checkout-review-shop svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.checkout-review-shop h3 {
+  margin: 0 0 7px;
+  font-size: 16px;
+}
+.checkout-review-shop p {
+  margin: 3px 0;
+}
+.checkout-reference {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--muted);
+}
+.checkout-payment-instructions {
+  padding: 22px;
+  background: var(--mint);
+  border-radius: 10px;
+  line-height: 1.75;
+}
+.checkout-payment-instructions p {
+  white-space: pre-wrap;
+}
+.checkout-payment-instructions > strong:last-child {
+  display: block;
+  font-size: 23px;
+  color: var(--forest);
+}
+.checkout-empty {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 60px 20px;
+}
+.checkout-empty p {
+  color: var(--muted);
+}
+.checkout-success {
+  padding: 60px 30px;
+  text-align: center;
+}
+.checkout-success-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--mint);
+  color: var(--green);
+}
+.checkout-success h2 {
+  font-size: 30px;
+  margin: 24px 0 12px;
+}
+.checkout-success > p {
+  max-width: 54ch;
+  margin: auto;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.checkout-success-reference {
+  display: grid;
+  gap: 8px;
+  padding: 24px 15px;
+  margin: 25px auto;
+  max-width: 580px;
+  background: var(--canvas);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.checkout-success-reference > span {
+  font-size: 12px;
+  color: var(--amber);
+}
+.checkout-success-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+.checkout-error {
+  margin-top: 20px;
+}
+.hq-hold-priority {
+  border: 1px solid var(--border);
+  background: var(--white);
+  border-radius: 12px;
+  padding: 22px 25px;
+  margin-bottom: 25px;
+}
+.hq-hold-priority.has-holds {
+  background: #fff8f5;
+  border-color: #e8b7a4;
+  border-left: 5px solid #b45436;
+}
+.hq-hold-priority-heading {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.hq-hold-priority-heading > div {
+  flex: 1;
+}
+.hq-hold-priority h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.5px;
+}
+.hq-hold-priority p {
+  margin: 5px 0 0;
+  color: #786255;
+  font-size: 13px;
+}
+.hold-priority-icon {
+  color: #a04c2f;
+  display: flex;
+}
+.hold-review-button {
+  border: 1px solid #b45436;
+  background: white;
+  color: #8e412b;
+}
+.hq-hold-priority-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 20px;
+  border-top: 1px solid #ecd8cc;
+}
+.hq-hold-priority-list > button {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  text-align: left;
+  gap: 16px;
+  padding: 19px 20px 0 0;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+}
+.hq-hold-priority-list small {
+  display: block;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+  color: #786255;
+  margin-top: 5px;
+}
+.hq-hold-priority-list p {
+  font-size: 12px;
+}
+.hq-hold-priority-list > button > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94412a;
+  font-weight: 700;
+  font-size: 13px;
+  min-height: 44px;
+}
+@media (max-width: 1150px) {
+  .checkout-columns {
+    grid-template-columns: minmax(0, 1fr) 275px;
+    gap: 20px;
+  }
+  .checkout-cart-item {
+    grid-template-columns: 95px minmax(0, 1fr);
+    gap: 15px;
+  }
+  .checkout-cart-item > img {
+    width: 95px;
+    height: 90px;
+    grid-row: span 2;
+  }
+  .checkout-cart-item > strong {
+    grid-column: 2;
+  }
+  .hq-hold-priority-heading {
+    flex-wrap: wrap;
+  }
+  .hq-hold-priority-list {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 850px) {
+  .sneaker-card-grid {
+    gap: 18px;
+  }
+  .sneaker-card-body {
+    padding: 22px 20px 12px;
+  }
+  .checkout-columns {
+    grid-template-columns: 1fr;
+  }
+  .checkout-summary {
+    margin-top: 8px;
+  }
+}
+@media (max-width: 600px) {
+  .checkout-steps {
+    gap: 16px;
+    font-size: 11px;
+    justify-content: space-between;
+  }
+  .checkout-steps li {
+    gap: 7px;
+  }
+  .checkout-steps li > span {
+    width: 27px;
+    height: 27px;
+  }
+  .sneaker-card-grid {
+    grid-template-columns: 1fr;
+  }
+  .sneaker-card-heading h2 {
+    font-size: 22px;
+  }
+  .catalog-cart-bar {
+    bottom: 10px;
+    padding: 16px;
+    gap: 12px;
+  }
+  .catalog-cart-bar > div > svg {
+    display: none;
+  }
+  .catalog-cart-bar strong {
+    font-size: 12px;
+  }
+  .catalog-cart-bar small {
+    font-size: 10px;
+  }
+  .catalog-cart-bar .button {
+    min-width: 125px;
+    padding: 12px;
+    font-size: 12px;
+  }
+  .checkout-heading {
+    align-items: flex-start;
+  }
+  .checkout-heading h2 {
+    font-size: 24px;
+  }
+  .checkout-heading p {
+    font-size: 12px;
+  }
+  .checkout-substeps {
+    gap: 10px 15px;
+    font-size: 11px;
+  }
+  .checkout-shop-form,
+  .checkout-evidence-form {
+    padding: 20px;
+  }
+  .checkout-shop-form .form-grid,
+  .checkout-evidence-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .checkout-review-shop {
+    padding: 18px;
+  }
+  .checkout-review-shop > div > svg {
+    display: none;
+  }
+  .checkout-review-shop p {
+    font-size: 12px;
+  }
+  .checkout-success {
+    padding: 38px 20px;
+  }
+  .checkout-success h2 {
+    font-size: 25px;
+  }
+  .hq-hold-priority {
+    padding: 20px;
+  }
+  .hq-hold-priority h2 {
+    font-size: 19px;
+  }
+  .hold-review-button {
+    width: 100%;
+    justify-content: center;
+  }
+  .hq-hold-priority-heading {
+    gap: 13px;
+  }
+}
+
+/* Keep the two-product catalog and its cart action together on laptop screens. */
+@media (min-width: 1000px) {
+  .catalog-page {
+    position: relative;
+    padding-top: 18px;
+  }
+  .catalog-page .page-heading {
+    padding-right: 290px;
+    margin-bottom: 12px;
+    min-height: 58px;
+  }
+  .catalog-page .page-heading .greeting {
+    display: none;
+  }
+  .catalog-page .page-heading h1 {
+    font-size: 26px;
+  }
+  .catalog-page .page-heading .subtitle {
+    margin-top: 5px;
+    line-height: 1.5;
+  }
+  .catalog-page .catalog-tools {
+    position: absolute;
+    top: 24px;
+    right: 36px;
+    width: 260px;
+    margin: 0;
+  }
+  .catalog-page .catalog-tools .search-field {
+    min-height: 44px;
+  }
+  .catalog-page .supplier-catalog-note {
+    margin: 0;
+    padding: 8px 0;
+  }
+  .catalog-page .sme-checkout {
+    margin-top: 10px;
+  }
+  .catalog-page .checkout-steps {
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+  }
+  .sneaker-card-grid {
+    gap: 18px;
+  }
+  .sneaker-photo {
+    height: clamp(110px, 18vh, 180px);
+    aspect-ratio: auto;
+  }
+  .sneaker-photo img {
+    object-fit: contain;
+  }
+  .sneaker-color {
+    left: 14px;
+    bottom: 10px;
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+  .sneaker-card-body {
+    padding: 14px 18px 10px;
+  }
+  .sneaker-card-heading {
+    gap: 10px;
+  }
+  .sneaker-card-heading h2 {
+    font-size: 20px;
+  }
+  .sneaker-card-heading p {
+    margin: 0 0 3px;
+    font-size: 11px;
+  }
+  .sneaker-card-heading .sneaker-unit-price {
+    text-align: right;
+    line-height: 1.5;
+  }
+  .sneaker-unit-price strong {
+    display: block;
+    font-size: 20px;
+  }
+  .sneaker-description {
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 8px 0;
+  }
+  .sneaker-selection {
+    display: grid;
+    grid-template-columns: 148px minmax(0, 1fr);
+    gap: 12px;
+    align-items: end;
+  }
+  .sneaker-card .variant-field {
+    margin: 0;
+  }
+  .sneaker-card .variant-field legend {
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+  .sneaker-card .size-options {
+    gap: 5px;
+  }
+  .sneaker-card .size-options > button {
+    min-width: 44px;
+    padding: 6px;
+  }
+  .sneaker-add-controls {
+    margin: 0;
+    gap: 8px;
+  }
+  .sneaker-add-controls > .field {
+    width: 56px;
+    font-size: 12px;
+    gap: 6px;
+  }
+  .sneaker-add-controls input {
+    min-height: 44px;
+    padding: 8px;
+  }
+  .sneaker-add-controls .button {
+    min-height: 44px;
+    padding: 8px;
+    font-size: 12px;
+    gap: 5px;
+  }
+  .sneaker-stock {
+    margin-top: 8px;
+    font-size: 11px;
+  }
+  .sneaker-added {
+    margin: 5px 0 0;
+    min-height: 18px;
+    font-size: 11px;
+  }
+  .catalog-cart-bar {
+    margin-top: 12px;
+    padding: 10px 16px;
+    bottom: 10px;
+  }
+  .catalog-cart-bar small {
+    font-size: 12px;
+  }
+}
+
+@media (min-width: 1000px) and (max-height: 740px) {
+  .catalog-page .page-heading {
+    min-height: 44px;
+    margin-bottom: 6px;
+  }
+  .catalog-page .page-heading h1 {
+    font-size: 22px;
+  }
+  .catalog-page .page-heading .subtitle {
+    margin-top: 3px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .catalog-page .supplier-catalog-note {
+    padding: 4px 0;
+  }
+  .catalog-page .sme-checkout {
+    margin-top: 6px;
+  }
+  .catalog-page .checkout-steps {
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+  }
+  .sneaker-photo {
+    height: clamp(84px, 14vh, 110px);
+  }
+  .sneaker-card-body {
+    padding: 12px 16px 8px;
+  }
+  .sneaker-description {
+    margin: 6px 0;
+  }
+  .sneaker-stock {
+    margin-top: 6px;
+  }
+}
+
+.payment-destinations {
+  padding: 22px;
+  border: 1px solid #cfdfd0;
+  border-radius: 12px;
+  background: #f0f6ee;
+}
+.payment-destinations-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.payment-wallet-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #deebdc;
+  color: var(--forest);
+  flex-shrink: 0;
+}
+.payment-destinations .payment-destinations-heading h3 {
+  margin: 0;
+  font-size: 19px;
+}
+.payment-destinations-heading p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.receiving-account-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.receiving-account {
+  background: white;
+  padding: 18px;
+  border: 1px solid #dce5d8;
+  border-radius: 10px;
+  min-width: 0;
+}
+.receiving-method {
+  display: inline-block;
+  font-size: 15px;
+  color: var(--forest);
+  margin-bottom: 15px;
+  overflow-wrap: anywhere;
+}
+.receiving-account dl {
+  margin: 0;
+}
+.receiving-account dl > div {
+  margin-bottom: 12px;
+}
+.receiving-account dt {
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 5px;
+}
+.receiving-account dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.receiving-account dd.receiving-number {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  user-select: text;
+}
+.receiving-account .button {
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.payment-transfer-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 18px;
+  margin-top: 18px;
+  border-top: 1px solid #ccdac8;
+  font-size: 13px;
+}
+.payment-transfer-total strong {
+  font-size: 23px;
+  color: var(--forest);
+}
+.payment-notes {
+  margin-top: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.payment-notes p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 5px 0 0;
+}
+.payment-account-missing,
+.payment-copy-error {
+  margin: 0;
+  padding: 12px;
+  background: #fff7e8;
+  border-radius: 8px;
+  color: #805711;
+  line-height: 1.6;
+  font-size: 13px;
+}
+.payment-account-updated,
+.payment-demo-note {
+  margin: 12px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.payment-demo-note {
+  font-weight: 600;
+}
+.payment-account-editor {
+  display: grid;
+  gap: 16px;
+}
+.payment-editor-heading h3 {
+  margin: 0;
+  font-size: 17px;
+}
+.payment-editor-heading p {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.payment-account-fields {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  min-width: 0;
+  margin: 0;
+}
+.payment-account-fields legend {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0 6px;
+}
+.payment-account-field-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.payment-account-field-grid .field {
+  margin: 0;
+  min-width: 0;
+}
+.payment-account-fields .text-link {
+  margin-top: 12px;
+  min-height: 44px;
+}
+.payment-account-editor > .button {
+  justify-self: start;
+  min-height: 44px;
+}
+.workflow-detail .payment-destinations {
+  margin-bottom: 20px;
+}
+.workflow-detail .receiving-account-list {
+  grid-template-columns: 1fr;
+}
+@media (max-width: 850px) {
+  .payment-account-field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .receiving-account-list {
+    grid-template-columns: 1fr;
+  }
+  .payment-destinations {
+    padding: 16px;
+  }
+  .receiving-account {
+    padding: 16px;
+  }
+}

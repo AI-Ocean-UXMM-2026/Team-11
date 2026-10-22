@@ -8,7 +8,9 @@ export const loginSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .regex(/^[a-z0-9][a-z0-9._-]{2,39}$/),
+    .min(1)
+    .max(100)
+    .regex(/^[^@\p{Cc}]+$/u),
   password: z.string().min(1).max(128),
 });
 export function portalHome(role: Role) {

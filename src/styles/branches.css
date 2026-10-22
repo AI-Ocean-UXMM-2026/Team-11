@@ -2,6 +2,34 @@
   display: grid;
   gap: 24px;
 }
+.driver-management {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+.driver-management > .panel {
+  min-width: 0;
+}
+.driver-management table {
+  min-width: 720px;
+}
+.driver-management .panel-heading p {
+  font-size: 13px;
+  margin-bottom: 0;
+}
+.driver-management .button {
+  min-height: 44px;
+}
+.driver-management .modal-form {
+  max-width: 620px;
+}
+.driver-empty {
+  padding: 32px 24px;
+  color: var(--muted);
+}
+.driver-empty h3 {
+  color: var(--ink);
+}
 .branch-summary {
   display: flex;
   align-items: center;
@@ -178,5 +206,193 @@
   }
   .branch-close {
     margin: 0 18px 18px;
+  }
+}
+
+.branch-detail-page {
+  display: grid;
+  gap: 24px;
+  padding-bottom: 12px;
+}
+.branch-information-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.branch-information-title {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.branch-information-title h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.branch-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.branch-information-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin: 0;
+  padding: 24px;
+}
+.branch-information-grid dt {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.branch-information-grid dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.branch-detail-page .panel-heading {
+  align-items: center;
+}
+.branch-detail-page .panel-heading h2 {
+  margin: 0;
+  font-size: 19px;
+}
+.branch-detail-page .panel-heading p {
+  margin: 8px 0 0;
+  line-height: 1.6;
+  font-size: 12px;
+}
+.branch-total-stock {
+  color: var(--forest);
+  font-size: 24px;
+  white-space: nowrap;
+}
+.branch-total-stock small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+.branch-stock-panel table {
+  min-width: 620px;
+}
+.branch-stock-product {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.branch-stock-product img {
+  border-radius: 7px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.branch-stock-product strong {
+  display: block;
+  font-size: 13px;
+}
+.branch-stock-product small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+}
+.branch-driver-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 24px;
+  border-top: 1px solid var(--border);
+}
+.branch-driver-row > div {
+  flex: 1;
+  min-width: 0;
+}
+.branch-driver-row strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.branch-driver-row small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.branch-history-error {
+  padding: 16px;
+  background: #fff4ed;
+  border: 1px solid #e6c7b7;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.branch-history-error p {
+  margin: 0 0 10px;
+}
+.branch-history-footer > .text-link {
+  margin: 18px 24px 0;
+}
+.branch-detail-page .stock-transfer-panel {
+  margin: 0;
+}
+.branch-detail-page .branch-close {
+  margin: 0;
+}
+.branch-detail-page .button,
+.branch-dialog .button {
+  min-height: 44px;
+}
+.branch-dialog .modal-form > p {
+  margin: 0;
+  line-height: 1.6;
+}
+.branch-dialog .inline-note {
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.branch-dialog .location-map {
+  height: min(30dvh, 230px);
+}
+@media (max-width: 850px) {
+  .branch-information-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+  }
+  .branch-information-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .branch-detail-actions {
+    width: 100%;
+  }
+  .branch-detail-actions > .button {
+    flex: 1;
+    justify-content: center;
+  }
+  .branch-detail-page .panel-heading {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+}
+@media (max-width: 500px) {
+  .branch-information-header,
+  .branch-information-grid {
+    padding: 18px;
+  }
+  .branch-information-grid {
+    gap: 22px 14px;
+  }
+  .branch-total-stock {
+    font-size: 21px;
+  }
+  .branch-driver-row {
+    padding: 18px;
+    flex-wrap: wrap;
+  }
+  .branch-driver-row > .workflow-status {
+    margin-left: 54px;
   }
 }

@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import { PaymentDestinations } from "./payment-destinations";
 import { LocationLink } from "./location-link";
 import { DeliveryTracking } from "./delivery-tracking";
 import { useDriverTracking } from "./driver-tracking-provider";
@@ -33,8 +35,14 @@ export function OrderWorkflow({
   query = {},
   refresh,
   demo,
+  paymentInstructions,
+  deliveryOrigin = "deliveries",
+  onReceiptConfirmed,
 }: {
   demo: boolean;
+  paymentInstructions?: string;
+  deliveryOrigin?: "overview" | "deliveries";
+  onReceiptConfirmed?: (message: string) => void;
   refresh: () => Promise<unknown>;
   query?: WorkspaceQuery;
   order: Order;
@@ -94,7 +102,21 @@ export function OrderWorkflow({
             demo,
             reference: order.reference,
           });
-        if (result.data) await updated(result.data, result.result?.message);
+        if (result.data) {
+          await updated(result.data, result.result?.message);
+          if (action === "receive" && sme) {
+            const receivedOrder =
+              result.data.selectedOrder ??
+              result.data.orders.find((item) => item.id === order.id);
+            onReceiptConfirmed?.(
+              `Full receipt confirmed for ${order.reference}. ${
+                receivedOrder?.status === "Done"
+                  ? "Your order is complete."
+                  : "Awaiting HQ completion."
+              }`,
+            );
+          }
+        }
       } catch {
         setError(
           "Connection interrupted. Retry the same action to check its recorded result.",
@@ -140,13 +162,22 @@ export function OrderWorkflow({
       }
     });
   }
+  const locationPanel =
+    (hq || sme) && w.attemptId ? (
+      <DeliveryTracking
+        orderId={order.id}
+        viewer={viewer}
+        demo={demo}
+        refresh={refresh}
+      />
+    ) : null;
   return (
     <div className="modal-form workflow-detail" aria-busy={pending}>
       <div className="workflow-heading">
         <div>
           <span className="eyebrow">STT WHOLESALE</span>
-          <h3>{order.business}</h3>
-          <p className="muted">{order.location}</p>
+          <h3>{sme ? "Order status" : order.business}</h3>
+          {!sme && <p className="muted">{order.location}</p>}
         </div>
         <span className="workflow-status">{order.status}</span>
       </div>
@@ -200,27 +231,35 @@ export function OrderWorkflow({
           </div>
         </dl>
       )}
-      <div className="workflow-contact">
-        <Truck size={18} />
-        <div>
-          <strong>{w.receiver}</strong>
-          <p>
-            {w.phone} · {order.location}
-          </p>
-          {w.notes && <p>{w.notes}</p>}
-          {order.pin && (
-            <LocationLink pin={order.pin} label="Open delivery pin in map" />
-          )}
-          <small>Driver: {w.driverName ?? "Awaiting assignment"}</small>
+      {!sme && (
+        <div className="workflow-contact">
+          <Truck size={18} />
+          <div>
+            <strong>{w.receiver}</strong>
+            <p>
+              {w.phone} · {order.location}
+            </p>
+            {w.notes && <p>{w.notes}</p>}
+            {order.pin && (
+              <LocationLink pin={order.pin} label="Open delivery pin in map" />
+            )}
+            <small>Driver: {w.driverName ?? "Awaiting assignment"}</small>
+          </div>
         </div>
-      </div>
+      )}
+      {sme && w.driverName && <p className="muted">Driver: {w.driverName}</p>}
       {(hq || sme || isDriver) && w.attemptId && (
-        <DeliveryTracking
-          orderId={order.id}
-          viewer={viewer}
-          demo={demo}
-          refresh={refresh}
-        />
+        <>
+          {isDriver && (
+            <Link
+              className="button secondary open-delivery-view"
+              href={`/driver/deliveries/${order.id}?from=${deliveryOrigin}`}
+            >
+              Open delivery view
+            </Link>
+          )}
+          {locationPanel}
+        </>
       )}
       {privateFinance && (
         <div className="workflow-checks">
@@ -248,13 +287,21 @@ export function OrderWorkflow({
           processed by this app.
         </div>
       )}
-      {privateFinance && (
+      {privateFinance && !w.paymentVerified && (
         <section className="workflow-section">
           <h4>
             <ShieldCheck size={17} />
             Payment evidence
           </h4>
-          <p className="payment-instructions">{w.instructions}</p>
+          {sme && (
+            <PaymentDestinations
+              instructions={w.instructions}
+              currentInstructions={paymentInstructions}
+              amount={total(order)}
+              demo={demo}
+              paymentConfirmed={w.paymentVerified}
+            />
+          )}
           {w.evidence.map((e) => (
             <div className="evidence-row" key={e.id}>
               <div>
@@ -381,15 +428,18 @@ export function OrderWorkflow({
                 </div>
               </div>
             )}
-          {hq && w.paymentVerified && !w.reserved && !terminal && (
-            <button
-              className="button primary"
-              disabled={pending}
-              onClick={() => act("confirm")}
-            >
-              Retry stock reservation
-            </button>
-          )}
+        </section>
+      )}
+      {hq && w.paymentVerified && !w.reserved && !terminal && (
+        <section className="workflow-section">
+          <h4>Stock reservation</h4>
+          <button
+            className="button primary"
+            disabled={pending}
+            onClick={() => act("confirm")}
+          >
+            Retry stock reservation
+          </button>
         </section>
       )}
       {pendingHandoff && (
@@ -757,24 +807,26 @@ export function OrderWorkflow({
           {error}
         </p>
       )}
-      <details className="workflow-section" open>
-        <summary>Order activity · {w.events.length} events</summary>
-        <ol className="workflow-timeline">
-          {w.events.map((e, i) => (
-            <li key={i}>
-              <strong>{e.action.replaceAll("_", " ")}</strong>
-              <small>
-                {e.actor} ·{" "}
-                {new Date(e.at).toLocaleString("en-GB", {
-                  timeZone: "Asia/Yangon",
-                })}{" "}
-                Yangon
-              </small>
-              {e.reason && <p>{e.reason}</p>}
-            </li>
-          ))}
-        </ol>
-      </details>
+      {!sme && !isDriver && (
+        <details className="workflow-section" open>
+          <summary>Order activity · {w.events.length} events</summary>
+          <ol className="workflow-timeline">
+            {w.events.map((e, i) => (
+              <li key={i}>
+                <strong>{e.action.replaceAll("_", " ")}</strong>
+                <small>
+                  {e.actor} ·{" "}
+                  {new Date(e.at).toLocaleString("en-GB", {
+                    timeZone: "Asia/Yangon",
+                  })}{" "}
+                  Yangon
+                </small>
+                {e.reason && <p>{e.reason}</p>}
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
     </div>
   );
 }
