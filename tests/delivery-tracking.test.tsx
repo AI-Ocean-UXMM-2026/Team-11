@@ -100,7 +100,7 @@ it("explains the missing driver pin before pickup and lets the driver hide/show 
   );
   expect(
     host.querySelector('[data-testid="map"]')?.getAttribute("data-color"),
-  ).toBe("#16834A");
+  ).toBe("#DC2626");
   const details = host.querySelector("details")!;
   expect(details.open).toBe(true);
   await act(async () => details.querySelector("summary")!.click());
@@ -167,14 +167,14 @@ it("explains missing GPS after pickup and labels stale fixes as last known", asy
     expect(host.textContent).toContain("Driver’s last known position");
   });
 });
-it("uses amber for a source-only map and keeps the existing HQ section", async () => {
+it("uses green for a source-only map and keeps the existing HQ section", async () => {
   snapshot.destination = null;
   snapshot.source.pin = { latitude: 16.9, longitude: 96.2 };
   await render("hq");
   expect(host.querySelector("details")).toBeNull();
   expect(
     host.querySelector('[data-testid="map"]')?.getAttribute("data-color"),
-  ).toBe("#D97706");
+  ).toBe("#16834A");
   expect(host.querySelector(".tracking-legend")?.textContent).toBe(
     "Dispatch source",
   );

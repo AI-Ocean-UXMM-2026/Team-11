@@ -38,7 +38,8 @@ it("seeds a fresh local demo with actionable holds, stock and private proofs exa
   expect(first.summary?.orders).toBe(10);
   expect(first.summary?.held).toBe(2);
   expect(first.summary?.awaiting).toBe(2);
-  expect(first.products).toHaveLength(6);
+  expect(first.products).toHaveLength(30);
+  expect(first.products.every((p) => p.sku?.startsWith("LY-"))).toBe(true);
   expect(first.accounts.find((a) => a.username === "aungthu")?.branchName).toBe(
     "Hlaing branch",
   );
@@ -56,6 +57,9 @@ it("seeds a fresh local demo with actionable holds, stock and private proofs exa
       .toString(),
   ).toBe("PNG");
   const second = await snapshot();
+  expect(second.products.map((p) => p.id)).toEqual(
+    first.products.map((p) => p.id),
+  );
   expect(second.orders.map((o) => o.id)).toEqual(first.orders.map((o) => o.id));
   expect(second.salesEvents).toHaveLength(5);
 }, 30000);

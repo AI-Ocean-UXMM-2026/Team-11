@@ -18,7 +18,7 @@ The supporting period is the last three complete **Asia/Yangon** calendar months
 - At least five distinct accepted emergency wholesale orders in that period.
 - At least one completed, explicitly backup-labelled refill with valid dispatch/receipt times in the same period.
 
-Without this evidence, the drawer shows exactly **“Insufficient history — continue with the HQ manual plan.”** No suggested quantity or confidence is fabricated. Retail demand never substitutes for emergency history.
+Without this evidence, HQ enters the target manually. The help control beside **Save settings** opens **AI suggestion criteria**, which explains the minimum evidence and any missing history. No suggested quantity or confidence is fabricated. Retail demand never substitutes for emergency history.
 
 The estimate is:
 
@@ -26,7 +26,7 @@ The estimate is:
 
 The three monthly buckets include zero-demand months. Frequency, total units, variation, lead time, completed receipts and the supporting dates are shown as evidence. Each original order is attributed once to its latest accepted branch; cancelled orders and unaccepted requests do not drive this estimate. This conservative attribution can omit prior replacement attempts. Unknown lost demand, returns, seasonal changes, historical stockouts and unrecorded events remain limitations. This is a statistical planning estimate, not a trained forecast or confidence score.
 
-HQ must enter a reason and explicitly **Apply recommended target**. The server recalculates eligibility and the quantity before saving and rejects changed/unsupported suggestions. The alert threshold must still fit the new target. Application changes settings only; it never transfers or deducts stock. Numeric estimates are computed by the database; Groq explains saved facts.
+When no target is saved and sufficient history exists, the target field starts with the supported recommendation and the source shows **AI-assisted**. HQ must enter a reason and explicitly **Save settings**. Existing manual targets remain unchanged; editing either numeric field selects **Manual**. The server recalculates eligibility and the quantity before saving an AI-assisted target and rejects changed/unsupported suggestions. The alert threshold must still fit the new target. Application changes settings only; it never transfers or deducts stock. Numeric estimates are computed by the database; Groq explains saved facts.
 
 ## Alerts and refill calculation
 
@@ -36,9 +36,9 @@ The overview alert includes branch, SKU, available quantity, threshold, target, 
 
 `proposed refill = max(0, target − (physical backup − takeover reservations) − confirmed incoming backup)`
 
-For example, 80 target with 16 available and no incoming needs 64 additional units. Allocated backup is already excluded from availability, so it is never subtracted twice. Only dispatched backup transfers with a confirmed, non-overdue arrival date offset the proposal. Retail transfers and reserved-but-undispatched transfers do not qualify. Open reserved or in-transit backup transfers block a duplicate planning refill, even with a different retry key. Creation locks the branch and recomputes the quantity on the server.
+For example, 80 target with 16 available and no incoming needs 64 additional units. Allocated backup is already excluded from availability, so it is never subtracted twice. Dispatched backup transfers offset the current refill proposal until the branch confirms receipt, including when an arrival date is missing or overdue. Retail transfers and reserved-but-undispatched transfers do not qualify. Open reserved or in-transit backup transfers block a duplicate planning refill, even with a different retry key. Creation locks the branch and recomputes the quantity on the server. Advanced monthly versions retain their separate arrival-date qualification rules.
 
-**Create refill** uses the existing HQ stock-transfer workflow and reserves HQ stock. HQ explicitly confirms actual dispatch; the destination still has no new available stock. Only the branch's existing physical-receipt confirmation increases on-hand and dedicated backup availability. The drawer can confirm arrival dates; overdue dates need reconfirming. Planning never automatically dispatches or receives stock.
+**Create refill** uses the existing HQ stock-transfer workflow and reserves HQ stock. HQ explicitly confirms actual dispatch; the destination still has no new available stock. Only the branch's existing physical-receipt confirmation increases on-hand and dedicated backup availability. Planning never automatically dispatches or receives stock.
 
 ## Emergency takeover and audit history
 
@@ -47,9 +47,9 @@ The duplicate **Emergency fulfillment / Record takeover** form has been removed
 from Stock Planning. Use the order's phased fulfilment controls to select a branch
 and quantities; [phased fulfilment](phased-fulfilment.md) describes partial
 branch deliveries and later delivery of outstanding pairs. Stock Planning retains
-backup settings, refills and takeover audit history.
+backup settings and refills. Takeover audit history is available in the dedicated **Takeover history** report.
 
-History links the original order and records branch, SKU quantity/unit snapshots, reason, original consignment resolution, deadline, requesting user/time, response/cancellation reason and order events. Fulfillment time comes from the recipient's existing confirmed receipt; unconfirmed deliveries are not marked fulfilled. Legacy missing deadlines are labelled **Not recorded**. The drawer shows recent requests/transfers; complete records remain in the existing database audit tables.
+The report links the original order and records branch, SKU quantity/unit snapshots, reason, original consignment resolution, deadline, requesting user/time, response/cancellation reason and order events. Fulfillment time comes from the recipient's existing confirmed receipt; unconfirmed deliveries are not marked fulfilled. Legacy missing deadlines are labelled **Not recorded**. The drawer shows recent transfers; complete records remain in the existing database audit tables.
 
 Pending requests can be cancelled with a reason inside the drawer. **Manage original wholesale order** opens the existing order modal within the same Stock Planning tab for accepted-order cancellation, holds and reconciliation. A cancellation before dispatch restores committed backup once; a cancellation after dispatch does not manufacture a stock return. Idempotency keys, order/inventory locks and existing stage guards prevent duplicate reservations, deductions and fulfillment.
 
@@ -82,6 +82,8 @@ If the key is absent, the page explicitly shows **AI setup needed**. Manual plan
 
 ## Deployment and verification
 
+Apply `20261023133651_restore_dispatched_backup_incoming.sql` after the catalog migrations to preserve dispatched backup incoming counts and longyi stock-unit defaults. The local demo loads it automatically. The Vercel deployment workflow does not apply database migrations.
+
 The local demo prepares historical planning fixtures on the first Stock Planning request. Every active branch/SKU receives six completed emergency orders and three received backup refills across the previous three complete Yangon months. Its dated observation and creation timeline is extended for that local dataset, with original dates retained in an internal `local.planning_history` audit entry. Current inventory balances, manual targets, thresholds and existing order records are preserved. Stable IDs and a period/catalog marker prevent duplicates on repeat visits. This seed runs only through the local PGlite adapter; hosted Supabase requests never run it. It needs no additional SQL migration and adds no fixture labels to the interface.
 
 Apply the existing planning/stock-pool migrations, followed by `20261022084937_stock_planning_workspace.sql` and `20261022090646_stock_planning_function_validation.sql`, then reload the PostgREST schema cache. The workspace migrations add per-SKU settings, private RLS-protected takeover metadata, HQ-only RPC actions and validated routine updates. It does not rewrite existing orders, sale events or inventory balances. It starts honest observation coverage at installation time.
@@ -94,4 +96,4 @@ Run `npm test -- --maxWorkers=2`, `npm run typecheck` and `npm run build`. Datab
 
 Official references: [Groq structured outputs](https://console.groq.com/docs/structured-outputs), [Groq rate limits](https://console.groq.com/docs/rate-limits), [Groq GPT-OSS 20B](https://console.groq.com/docs/model/openai/gpt-oss-20b).
 
-The revised workspace was verified with database tests for manual settings without history, inclusive threshold alert deduplication/recovery, backend recommendation eligibility, exact refill calculations, receipt-only availability, backup-only reservation/dispatch, cancellation restoration and already-dispatched HQ consignment reconciliation. UI checks cover Manage-only mounting, Escape/focus restoration, filters, manual validation and explicit recommendation application. The full regression suite passed (234 tests), followed by the added dispatched-consignment and linked-original-order tests. TypeScript checks and the optimized production build also passed. Desktop and 375px mobile layouts were inspected. The official local Supabase security advisor could not connect because the Docker Supabase database on port 54322 was not running; PGlite database checks passed. Hosted migrations have not been applied.
+On October 23, 2026, all 296 tests across 58 files passed, followed by TypeScript checks and the optimized production build. Regression coverage includes dispatched incoming backup with missing or overdue arrival dates, receipt-only availability, separate monthly arrival qualification, current catalog seeding, API mocks, map colors, React-controlled settings, explicit recommendation saves and original-order links in the takeover report. The official local Supabase security advisor could not connect because the Docker Supabase database on port 54322 was not running; PGlite database checks passed. The corrective migration has not been applied to hosted Supabase.

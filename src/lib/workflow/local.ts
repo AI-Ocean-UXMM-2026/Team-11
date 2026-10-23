@@ -99,6 +99,7 @@ async function applyMigrations(db: PGlite) {
     "20261023020000_longyi_price_tiers.sql",
     "20261023030000_sme_saved_delivery_location.sql",
     "20261023040000_phase_returned_hq_consignment.sql",
+    "20261023133651_restore_dispatched_backup_incoming.sql",
   ]) {
     const done = await db.query(
       "select 1 from public.workflow_migrations where name=$1",

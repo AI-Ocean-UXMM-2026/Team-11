@@ -150,7 +150,7 @@ it("labels preceding customer stops anonymously and shows the customer's own num
   });
   expect(markers.find((marker: any) => marker.id === "stop-2")).toMatchObject({
     number: 2,
-    color: "#16834A",
+    color: "#DC2626",
   });
 });
 it("shows planned source routing before pickup, and does not request a route without a source or destination", async () => {

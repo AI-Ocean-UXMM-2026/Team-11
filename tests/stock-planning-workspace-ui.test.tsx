@@ -4,10 +4,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StockPlanning } from "../src/components/stock-planning";
+import { TakeoverReport } from "../src/components/takeover-report";
 import { demoData } from "../src/lib/demo-data";
 import type {
   BackupPlanningDetail,
   BackupPlanningRow,
+  TakeoverReportPage,
 } from "../src/lib/stock-planning";
 
 const original: BackupPlanningRow = {
@@ -119,7 +121,6 @@ async function render(initialBranchId?: string) {
           demo
           updated={async () => {}}
           initialBranchId={initialBranchId}
-          openOrder={openOrder}
         />
       </QueryClientProvider>,
     );
@@ -143,28 +144,55 @@ async function manage() {
   await settle();
   return b;
 }
-it("opens the linked original wholesale order through the existing order workflow", async () => {
-  detail.takeovers = [
-    {
-      id: "handoff",
-      orderId: "original-order",
-      reference: "STT-original",
-      quantity: 8,
-      unit: "pairs",
-      reason: "HQ vehicle delay",
-      resolution: "Not dispatched",
-      responseReason: null,
-      deadline: new Date().toISOString(),
-      fulfilledAt: null,
-      status: "reserved",
-      actor: "HQ",
-      at: new Date().toISOString(),
-      events: [],
-    },
-  ];
-  await render();
-  await manage();
-  await click("Manage original wholesale order");
+async function input(element: HTMLInputElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(element, value);
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+it("opens the original wholesale order from the dedicated takeover report", async () => {
+  const report: TakeoverReportPage = {
+    page: 1,
+    pageSize: 20,
+    total: 1,
+    rows: [
+      {
+        id: "handoff",
+        orderId: "original-order",
+        branchName: row.branchName,
+        productId: row.productId,
+        variant: row.variant,
+        reference: "STT-original",
+        quantity: 8,
+        unit: "pairs",
+        reason: "HQ vehicle delay",
+        resolution: "Not dispatched",
+        responseReason: null,
+        deadline: new Date().toISOString(),
+        fulfilledAt: null,
+        status: "reserved",
+        actor: "HQ",
+        at: new Date().toISOString(),
+        events: [],
+      },
+    ],
+  };
+  fetcher.mockResolvedValue(Response.json({ data: report }));
+  await act(async () => {
+    root.render(
+      <QueryClientProvider client={client}>
+        <TakeoverReport
+          viewer={{ id: "hq", role: "hq", name: "HQ" }}
+          openOrder={openOrder}
+        />
+      </QueryClientProvider>,
+    );
+  });
+  await settle();
+  await click("STT-original");
   expect(openOrder).toHaveBeenCalledWith("original-order");
   expect(host.querySelector("dialog")).toBeNull();
 });
@@ -179,13 +207,19 @@ it("shows a compact overview and opens the Hlaing plan only after Manage, with f
   const trigger = await manage();
   expect(host.querySelector("dialog")?.open).toBe(true);
   expect(host.textContent).toContain("Hlaing backup plan");
+  expect(host.textContent).toContain("HQ settings");
+  expect(host.textContent).not.toContain("AI suggestion criteria");
+  const criteria = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="Show AI suggestion criteria"]',
+  )!;
+  await act(async () => criteria.click());
   expect(host.textContent).toContain(
-    "Insufficient history — continue with the HQ manual plan.",
+    "History does not meet the minimum yet. Set the target manually.",
   );
   expect(host.textContent).not.toContain("Apply recommended target");
   expect(host.textContent).not.toContain("Emergency fulfillment");
   expect(host.textContent).not.toContain("Record takeover");
-  expect(host.textContent).toContain("Takeover history");
+  expect(host.textContent).not.toContain("Takeover history");
   expect(host.textContent).not.toContain("Safety buffer (%)");
   await act(async () => {
     host
@@ -205,8 +239,8 @@ it("validates the alert threshold against target and saves manual settings witho
   const threshold = form.elements.namedItem("threshold") as HTMLInputElement;
   (form.elements.namedItem("reason") as HTMLInputElement).value =
     "Initial HQ manual reserve";
-  target.value = "60";
-  threshold.value = "61";
+  await input(target, "60");
+  await input(threshold, "61");
   await act(async () => {
     form.dispatchEvent(
       new Event("submit", { bubbles: true, cancelable: true }),
@@ -218,7 +252,7 @@ it("validates the alert threshold against target and saves manual settings witho
   expect(
     fetcher.mock.calls.filter((c) => c[1]?.method === "POST"),
   ).toHaveLength(0);
-  threshold.value = "20";
+  await input(threshold, "20");
   await act(async () => {
     form.dispatchEvent(
       new Event("submit", { bubbles: true, cancelable: true }),
@@ -273,6 +307,7 @@ it("shows an existing refill instead of offering a duplicate and does not count 
   expect(host.querySelector("dialog")?.textContent).toContain("18 pairs");
 });
 it("requires explicit HQ application of a supported recommendation", async () => {
+  row.target = null;
   row.recommendation = {
     ...row.recommendation,
     eligible: true,
@@ -284,14 +319,18 @@ it("requires explicit HQ application of a supported recommendation", async () =>
   };
   await render();
   await manage();
-  expect(host.textContent).toContain("65 pairs");
+  expect(
+    host.querySelector<HTMLInputElement>('input[name="target"]')!.value,
+  ).toBe("65");
+  expect(
+    host.querySelector("#backup-settings .backup-status")?.textContent,
+  ).toBe("AI-assisted");
   expect(
     fetcher.mock.calls.filter((c) => c[1]?.method === "POST"),
   ).toHaveLength(0);
-  const apply = [...host.querySelectorAll("button")].find(
-    (b) => b.textContent === "Apply recommended target",
-  )!;
-  const form = apply.closest("form")!;
+  const form = host.querySelector<HTMLInputElement>(
+    'input[name="target"]',
+  )!.form!;
   (form.elements.namedItem("reason") as HTMLInputElement).value =
     "HQ reviewed the supporting evidence";
   await act(async () =>

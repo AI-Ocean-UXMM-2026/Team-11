@@ -242,6 +242,12 @@ it("creates one backup refill despite different retry keys and adds it only afte
     confirmed: true,
   });
   expect((await detail(b)).row).toMatchObject({ available: 16, incoming: 64 });
+  // Current refill planning must still count a dispatched transfer without a
+  // current arrival confirmation. Receipt is what removes it from incoming.
+  await db.query(
+    "insert into supplylink_private.planning_arrivals(transfer_id,due,reason,actor_id) values($1,(now() at time zone 'Asia/Yangon')::date-1,'Arrival delayed',$2)",
+    [first.transferId, users.hq],
+  );
   expect((await detail(b)).row).toMatchObject({
     available: 16,
     incoming: 64,

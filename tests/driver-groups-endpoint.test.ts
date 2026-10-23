@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   action: vi.fn(),
 }));
 vi.mock("../src/lib/workflow/server", () => ({
+  presentPortalData: <T>(data: T) => data,
   workflowActor: mocks.actor,
   WorkflowError: class extends Error {
     constructor(
