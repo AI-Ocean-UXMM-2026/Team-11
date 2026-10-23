@@ -18,7 +18,7 @@ const pendingTransfer = {
   reference: "TR-PENDING",
   sourceBranchId: null,
   destinationBranchId: branchId,
-  source: "Ocean Pride Longyi HQ",
+  source: "Oceanpride Longyi HQ",
   destination: "Hlaing branch",
   productId: "product-1",
   variant: "Black · EU 38",
@@ -65,7 +65,7 @@ async function render() {
         reference: "TR-OUT",
         sourceBranchId: branchId,
         destinationBranchId: null,
-        destination: "Ocean Pride Longyi HQ",
+        destination: "Oceanpride Longyi HQ",
       },
     ],
     branches: [

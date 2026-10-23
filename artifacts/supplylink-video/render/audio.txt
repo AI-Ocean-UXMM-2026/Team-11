@@ -1,0 +1,8 @@
+file 'D:/Into the AI Ocean/artifacts/supplylink-video/render/voice-01.wav'
+file 'D:/Into the AI Ocean/artifacts/supplylink-video/render/voice-02.wav'
+file 'D:/Into the AI Ocean/artifacts/supplylink-video/render/voice-03.wav'
+file 'D:/Into the AI Ocean/artifacts/supplylink-video/render/voice-04.wav'
+file 'D:/Into the AI Ocean/artifacts/supplylink-video/render/voice-05.wav'
+file 'D:/Into the AI Ocean/artifacts/supplylink-video/render/voice-06.wav'
+file 'D:/Into the AI Ocean/artifacts/supplylink-video/render/voice-07.wav'
+file 'D:/Into the AI Ocean/artifacts/supplylink-video/render/voice-08.wav'

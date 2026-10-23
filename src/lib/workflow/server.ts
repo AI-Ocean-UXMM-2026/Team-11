@@ -236,25 +236,26 @@ export function presentPortalData<T>(data: T): T {
         ]),
       );
     if (typeof value !== "string") return value;
-    if (key === "brand" && value === "STT") return "Ocean Pride Longyi";
-    if (value === "STT Yangon HQ") return "Ocean Pride Longyi HQ";
+    if (key === "brand" && value === "STT") return "Oceanpride Longyi";
+    if (value === "STT Yangon HQ") return "Oceanpride Longyi HQ";
     if (key === "reference" && value.startsWith("STT-"))
       return `OPL-${value.slice(4)}`;
-    return value;
+    return value.replace(/\bOcean Pride\b/gi, "Oceanpride");
   };
   return present(data) as T;
 }
 
 function presentPortalMessage(message: string): string {
   return message
-    .replace(/\bSTT Yangon HQ\b/g, "Ocean Pride Longyi HQ")
-    .replace(/\bSTT shoe variant\b/gi, "Ocean Pride Longyi style")
-    .replace(/\bSTT variant\b/gi, "Ocean Pride Longyi style")
+    .replace(/\bOcean Pride\b/gi, "Oceanpride")
+    .replace(/\bSTT Yangon HQ\b/g, "Oceanpride Longyi HQ")
+    .replace(/\bSTT shoe variant\b/gi, "Oceanpride Longyi style")
+    .replace(/\bSTT variant\b/gi, "Oceanpride Longyi style")
     .replace(/\bshoe variant\b/gi, "Longyi style")
     .replace(/\bsneakers?\b/gi, "Longyi")
     .replace(/\bfootwear\b/gi, "Longyi")
     .replace(/\bshoes?\b/gi, "Longyi")
-    .replace(/\bSTT\b/g, "Ocean Pride Longyi");
+    .replace(/\bSTT\b/g, "Oceanpride Longyi");
 }
 export async function readEvidence(
   actor: Viewer,

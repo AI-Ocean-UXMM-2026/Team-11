@@ -1,0 +1,51 @@
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'artifacts\supplylink-video\SupplyLink-by-OceanPride-4min-Pitch.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    title           : SupplyLink by OceanPride - A Smart Delivery Recovery Solution
+    encoder         : Lavf61.7.100
+    comment         : Recorded local product demo with synthetic orders and GPS. AI narration.
+  Duration: 00:04:00.02, start: 0.000000, bitrate: 418 kb/s
+  Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(progressive), 1920x1080, 224 kb/s, 24 fps, 24 tbr, 12288 tbn (default)
+      Metadata:
+        handler_name    : VideoHandler
+        vendor_id       : [0][0][0][0]
+        encoder         : Lavc61.19.100 libx264
+  Stream #0:1[0x2](und): Audio: aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 189 kb/s (default)
+      Metadata:
+        handler_name    : SoundHandler
+        vendor_id       : [0][0][0][0]
+[Parsed_volumedetect_0 @ 000002a1eb45e940] n_samples: 0
+Stream mapping:
+  Stream #0:0 -> #0:0 (h264 (native) -> wrapped_avframe (native))
+  Stream #0:1 -> #0:1 (aac (native) -> pcm_s16le (native))
+Press [q] to stop, [?] for help
+Output #0, null, to 'NUL':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    title           : SupplyLink by OceanPride - A Smart Delivery Recovery Solution
+    comment         : Recorded local product demo with synthetic orders and GPS. AI narration.
+    encoder         : Lavf61.7.100
+  Stream #0:0(und): Video: wrapped_avframe, yuv420p(progressive), 1920x1080, q=2-31, 200 kb/s, 24 fps, 24 tbn (default)
+      Metadata:
+        handler_name    : VideoHandler
+        vendor_id       : [0][0][0][0]
+        encoder         : Lavc61.19.100 wrapped_avframe
+  Stream #0:1(und): Audio: pcm_s16le, 48000 Hz, stereo, s16, 1536 kb/s (default)
+      Metadata:
+        handler_name    : SoundHandler
+        vendor_id       : [0][0][0][0]
+        encoder         : Lavc61.19.100 pcm_s16le
+[Parsed_volumedetect_0 @ 000002a1ec26ae00] n_samples: 22745088
+[Parsed_volumedetect_0 @ 000002a1ec26ae00] mean_volume: -18.7 dB
+[Parsed_volumedetect_0 @ 000002a1ec26ae00] max_volume: -0.9 dB
+[Parsed_volumedetect_0 @ 000002a1ec26ae00] histogram_0db: 6
+[Parsed_volumedetect_0 @ 000002a1ec26ae00] histogram_1db: 428
+[Parsed_volumedetect_0 @ 000002a1ec26ae00] histogram_2db: 2404
+[Parsed_volumedetect_0 @ 000002a1ec26ae00] histogram_3db: 9184
+[Parsed_volumedetect_0 @ 000002a1ec26ae00] histogram_4db: 25604
+[out#0/null @ 000002a1eb44ea00] video:2475KiB audio:44424KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+frame= 5760 fps=938 q=-0.0 Lsize=N/A time=00:04:00.00 bitrate=N/A speed=39.1x    

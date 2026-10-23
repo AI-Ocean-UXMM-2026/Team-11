@@ -69,7 +69,7 @@ beforeEach(async () => {
         username: "hq.driver",
         role: "driver",
         status: "Active",
-        affiliation: "Ocean Pride Longyi HQ",
+        affiliation: "Oceanpride Longyi HQ",
         branchId: null,
       },
       {
@@ -106,7 +106,7 @@ afterEach(async () => {
 
 it("lists only drivers with their current affiliation and initializes editing to that location", async () => {
   expect(host.textContent).toContain("HQ Driver");
-  expect(host.textContent).toContain("Ocean Pride Longyi HQ");
+  expect(host.textContent).toContain("Oceanpride Longyi HQ");
   expect(host.textContent).toContain("Branch Driver");
   expect(host.textContent).toContain("Hlaing branch");
   expect(host.textContent).not.toContain("Private SME");

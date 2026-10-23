@@ -1,0 +1,43 @@
+{
+  "id": "09f0f217-8990-4e11-8726-287b691add4a",
+  "reference": "OPL-09F0F217-8990-4E11-8726-287B691ADD4A",
+  "status": "Done",
+  "fulfilment": {
+    "lines": [
+      {
+        "name": "Normal Longyi",
+        "ordered": 60,
+        "variant": "Style 1 · 1 piece",
+        "received": 60,
+        "productId": "8909d824-0b41-4e41-9f21-35e7b5c1ace7"
+      }
+    ],
+    "current": null,
+    "history": [
+      {
+        "id": "ef89aef5-ac06-46f5-a173-c9f3b92b7fbc",
+        "pairs": 40,
+        "state": "received",
+        "number": 1,
+        "source": "Hlaing branch",
+        "handover": true,
+        "received": true,
+        "completedAt": "2026-10-23T12:56:57.395+06:00"
+      },
+      {
+        "id": "33e93552-d862-4ee0-a435-d1bcc7f54ab8",
+        "pairs": 20,
+        "state": "received",
+        "number": 2,
+        "source": "Oceanpride Longyi HQ",
+        "handover": true,
+        "received": true,
+        "completedAt": "2026-10-23T12:57:37.232+06:00"
+      }
+    ],
+    "ordered": 60,
+    "received": 60,
+    "remaining": 0,
+    "deliveryStatus": "Done"
+  }
+}

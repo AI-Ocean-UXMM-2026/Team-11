@@ -228,7 +228,7 @@ it("shows 40 of 60 received and phase 2 Shipping separately from the remaining o
       number: 2,
       state: "dispatched",
       sourceBranchId: null,
-      source: "Ocean Pride Longyi HQ",
+      source: "Oceanpride Longyi HQ",
       pairs: 20,
       received: false,
       attemptId: "attempt",
@@ -268,7 +268,7 @@ it("shows 40 of 60 received and phase 2 Shipping separately from the remaining o
   expect(host.textContent).toContain("20 pairs");
   expect(host.textContent).toContain("Order remaining");
   expect(host.textContent).toContain("Phase 2 · 20 pairs");
-  expect(host.textContent).toContain("Ocean Pride Longyi HQ · Shipping");
+  expect(host.textContent).toContain("Oceanpride Longyi HQ · Shipping");
   expect(host.querySelector("button")).toBeNull();
   expect(host.textContent).not.toContain("HQ completion");
 });

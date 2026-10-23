@@ -39,7 +39,7 @@ export const demoData: WorkspaceData = {
       shipping: 5000,
       status: "Awaiting verification",
       date: "2026-10-20",
-      source: "Ocean Pride Longyi HQ",
+      source: "Oceanpride Longyi HQ",
     },
     {
       id: "2",
@@ -52,7 +52,7 @@ export const demoData: WorkspaceData = {
       shipping: 5000,
       status: "Shipping",
       date: "2026-10-20",
-      source: "Ocean Pride Longyi HQ",
+      source: "Oceanpride Longyi HQ",
     },
     {
       id: "3",
@@ -65,7 +65,7 @@ export const demoData: WorkspaceData = {
       shipping: 6000,
       status: "Preparing",
       date: "2026-10-20",
-      source: "Ocean Pride Longyi HQ",
+      source: "Oceanpride Longyi HQ",
     },
     {
       id: "4",
@@ -78,7 +78,7 @@ export const demoData: WorkspaceData = {
       shipping: 7000,
       status: "On hold",
       date: "2026-10-19",
-      source: "Ocean Pride Longyi HQ",
+      source: "Oceanpride Longyi HQ",
     },
     {
       id: "5",
@@ -104,7 +104,7 @@ export const demoData: WorkspaceData = {
       shipping: 5000,
       status: "Done",
       date: "2026-10-18",
-      source: "Ocean Pride Longyi HQ",
+      source: "Oceanpride Longyi HQ",
     },
     {
       id: "7",
@@ -117,7 +117,7 @@ export const demoData: WorkspaceData = {
       shipping: 6000,
       status: "Complete",
       date: "2026-10-18",
-      source: "Ocean Pride Longyi HQ",
+      source: "Oceanpride Longyi HQ",
     },
     {
       id: "8",
@@ -130,7 +130,7 @@ export const demoData: WorkspaceData = {
       shipping: 5000,
       status: "Done",
       date: "2026-10-17",
-      source: "Ocean Pride Longyi HQ",
+      source: "Oceanpride Longyi HQ",
     },
   ],
   products: [
@@ -637,7 +637,7 @@ export const demoData: WorkspaceData = {
       username: "zawmin",
       role: "driver",
       status: "Active",
-      affiliation: "Ocean Pride Longyi HQ",
+      affiliation: "Oceanpride Longyi HQ",
     },
     {
       id: "a4",

@@ -93,7 +93,7 @@ export function WorkflowAdmin({
         <h2>
           {mode === "settings"
             ? "Delivery & payment setup"
-            : "Adjust Ocean Pride Longyi stock or price"}
+            : "Adjust Oceanpride Longyi stock or price"}
         </h2>
       </div>
       <form
@@ -251,7 +251,7 @@ export function WorkflowAdmin({
             <label className="field">
               Stock location
               <select name="branchId">
-                <option value="">Ocean Pride Longyi HQ</option>
+                <option value="">Oceanpride Longyi HQ</option>
                 {data.branches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}

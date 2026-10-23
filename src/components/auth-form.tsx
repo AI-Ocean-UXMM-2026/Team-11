@@ -75,16 +75,16 @@ function PortalLoginForm({
       <span className="portal-icon">
         <PortalIcon size={24} aria-hidden="true" />
       </span>
-      <span className="auth-brand-label">Ocean Pride Longyi supplier</span>
+      <span className="auth-brand-label">Oceanpride Longyi supplier</span>
       <h1>{label} sign in</h1>
       <p>
         {portal === "sme"
-          ? "Order Ocean Pride Longyi, follow deliveries and keep your shop moving."
+          ? "Order Oceanpride Longyi, follow deliveries and keep your shop moving."
           : portal === "driver"
             ? "Your assigned deliveries and handovers, in one place."
             : portal === "branch"
               ? "Your branch stock, refills, retail sales and assigned deliveries."
-              : "Manage Ocean Pride Longyi stock, branches and business accounts."}
+              : "Manage Oceanpride Longyi stock, branches and business accounts."}
       </p>
       <div className="auth-issued-note">
         <ShieldCheck size={17} aria-hidden="true" />

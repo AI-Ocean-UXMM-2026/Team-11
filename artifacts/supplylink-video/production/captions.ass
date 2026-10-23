@@ -1,0 +1,69 @@
+﻿[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 0
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Segoe UI,30,&H00FFFFFF,&H00FFFFFF,&H00121D21,&H00121D21,-1,0,0,0,100,100,0,0,3,9,0,2,140,140,50,1
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.60,0:00:06.00,Default,,0,0,0,,Imagine a longyi retailer in Yangon preparing for a busy sales week.
+Dialogue: 0,0:00:06.00,0:00:10.50,Default,,0,0,0,,Sixty pieces have been ordered. The payment has been sent.
+Dialogue: 0,0:00:10.50,0:00:13.20,Default,,0,0,0,,Then the delivery runs into trouble.
+Dialogue: 0,0:00:13.20,0:00:16.80,Default,,0,0,0,,Where is the stock? Who can take over?
+Dialogue: 0,0:00:16.80,0:00:19.50,Default,,0,0,0,,And how much is still missing?
+Dialogue: 0,0:00:19.50,0:00:24.00,Default,,0,0,0,,This is the problem Supply Link is built to solve.
+Dialogue: 0,0:00:25.60,0:00:29.98,Default,,0,0,0,,Introducing Supply Link by Ocean Pride: a smart delivery recovery
+Dialogue: 0,0:00:29.98,0:00:33.49,Default,,0,0,0,,solution. It connects supplier headquarters, branches, drivers, and
+Dialogue: 0,0:00:33.49,0:00:38.30,Default,,0,0,0,,retailers in one coordinated workflow. From the first order to the
+Dialogue: 0,0:00:38.30,0:00:43.12,Default,,0,0,0,,final receipt, every team can see the information needed to move
+Dialogue: 0,0:00:43.12,0:00:44.00,Default,,0,0,0,,fulfilment forward.
+Dialogue: 0,0:00:45.60,0:00:49.09,Default,,0,0,0,,The journey starts in the retailer portal.
+Dialogue: 0,0:00:49.09,0:00:54.07,Default,,0,0,0,,Browse the longyi catalog, compare normal and premium styles, and
+Dialogue: 0,0:00:54.07,0:00:59.56,Default,,0,0,0,,choose quantities for the shop. The cart brings every selected style
+Dialogue: 0,0:00:59.56,0:01:03.55,Default,,0,0,0,,together. Before ordering, review the receiver, delivery address,
+Dialogue: 0,0:01:03.55,0:01:08.53,Default,,0,0,0,,shipping charge, and complete total. Then transfer the full amount
+Dialogue: 0,0:01:08.53,0:01:13.02,Default,,0,0,0,,using the supplier's payment instructions and upload payment evidence.
+Dialogue: 0,0:01:13.02,0:01:17.50,Default,,0,0,0,,Headquarters verifies the actual payment before confirming the order
+Dialogue: 0,0:01:17.50,0:01:19.00,Default,,0,0,0,,and reserving stock.
+Dialogue: 0,0:01:20.60,0:01:24.53,Default,,0,0,0,,Headquarters assigns an approved driver and prepares the delivery.
+Dialogue: 0,0:01:24.53,0:01:27.59,Default,,0,0,0,,Physical pickup is recorded separately from dispatch.
+Dialogue: 0,0:01:27.59,0:01:31.96,Default,,0,0,0,,During delivery, the driver can share location while the delivery
+Dialogue: 0,0:01:31.96,0:01:36.33,Default,,0,0,0,,page stays open. Headquarters and the ordering retailer can follow
+Dialogue: 0,0:01:36.33,0:01:39.82,Default,,0,0,0,,the road route, estimated driving time, and distance.
+Dialogue: 0,0:01:39.82,0:01:44.19,Default,,0,0,0,,The map supports visibility, while handover and receipt remain explicit
+Dialogue: 0,0:01:44.19,0:01:49.00,Default,,0,0,0,,confirmations. A location pin alone never marks the goods as received.
+Dialogue: 0,0:01:50.60,0:01:54.09,Default,,0,0,0,,Now imagine the original delivery cannot continue.
+Dialogue: 0,0:01:54.09,0:01:59.08,Default,,0,0,0,,Headquarters places the order on hold and records the issue.
+Dialogue: 0,0:01:59.08,0:02:03.57,Default,,0,0,0,,Before arranging a replacement, the original consignment must be
+Dialogue: 0,0:02:03.57,0:02:08.06,Default,,0,0,0,,resolved. Supply Link then helps headquarters coordinate a suitable
+Dialogue: 0,0:02:08.06,0:02:11.56,Default,,0,0,0,,branch using its dedicated wholesale backup reserve.
+Dialogue: 0,0:02:11.56,0:02:17.05,Default,,0,0,0,,Retail stock stays separate. In our demo, the retailer ordered sixty
+Dialogue: 0,0:02:17.05,0:02:21.04,Default,,0,0,0,,longyi pieces, but the branch can supply forty.
+Dialogue: 0,0:02:21.04,0:02:25.53,Default,,0,0,0,,Headquarters requests that first phase. Branch staff accept, reserve
+Dialogue: 0,0:02:25.53,0:02:29.02,Default,,0,0,0,,the selected stock, and arrange their driver.
+Dialogue: 0,0:02:29.02,0:02:34.01,Default,,0,0,0,,The retailer keeps the same order reference and agreed prices.
+Dialogue: 0,0:02:34.01,0:02:38.00,Default,,0,0,0,,Recovery becomes a visible sequence of responsibilities, quantities,
+Dialogue: 0,0:02:38.00,0:02:39.00,Default,,0,0,0,,and confirmations.
+Dialogue: 0,0:02:40.60,0:02:45.56,Default,,0,0,0,,After the first delivery, Supply Link shows forty of sixty pieces
+Dialogue: 0,0:02:45.56,0:02:49.63,Default,,0,0,0,,received, with twenty remaining. Headquarters can arrange the outstanding
+Dialogue: 0,0:02:49.63,0:02:53.69,Default,,0,0,0,,twenty from its own stock or another suitable branch.
+Dialogue: 0,0:02:53.69,0:02:56.85,Default,,0,0,0,,Each phase keeps its own delivery progress.
+Dialogue: 0,0:02:56.85,0:03:00.91,Default,,0,0,0,,Every delivery requires driver handover and retailer receipt confirmation.
+Dialogue: 0,0:03:00.91,0:03:05.88,Default,,0,0,0,,Only after all pieces are accounted for, with no unresolved issue,
+Dialogue: 0,0:03:05.88,0:03:10.84,Default,,0,0,0,,does the order become Done. The completed order records one wholesale
+Dialogue: 0,0:03:10.84,0:03:14.00,Default,,0,0,0,,sale, even when fulfilment takes multiple deliveries.
+Dialogue: 0,0:03:15.60,0:03:19.57,Default,,0,0,0,,Stock Planning helps headquarters prepare for the next disruption.
+Dialogue: 0,0:03:19.57,0:03:23.55,Default,,0,0,0,,Review backup availability, set targets, and respond to low-stock
+Dialogue: 0,0:03:23.55,0:03:27.08,Default,,0,0,0,,alerts. Where sufficient emergency-order and refill history exists,
+Dialogue: 0,0:03:27.08,0:03:29.73,Default,,0,0,0,,evidence-based recommendations support target decisions. Optional
+Dialogue: 0,0:03:29.73,0:03:32.38,Default,,0,0,0,,AI explanations clarify the saved figures.
+Dialogue: 0,0:03:32.38,0:03:36.35,Default,,0,0,0,,Headquarters stays in control, and incoming stock becomes available
+Dialogue: 0,0:03:36.35,0:03:39.00,Default,,0,0,0,,only after physical receipt is confirmed.
+Dialogue: 0,0:03:40.60,0:03:44.60,Default,,0,0,0,,For retailers, clearer progress. For branches, a defined backup role.
+Dialogue: 0,0:03:44.60,0:03:47.80,Default,,0,0,0,,For drivers, focused delivery work. For headquarters, coordinated
+Dialogue: 0,0:03:47.80,0:03:51.80,Default,,0,0,0,,recovery and accountable stock. We invite supplier partners to pilot
+Dialogue: 0,0:03:51.80,0:03:54.20,Default,,0,0,0,,the workflow and measure the results.
+Dialogue: 0,0:03:54.20,0:03:57.40,Default,,0,0,0,,Supply Link by Ocean Pride. Every order connected.
+Dialogue: 0,0:03:57.40,0:03:59.00,Default,,0,0,0,,Every piece accounted for.

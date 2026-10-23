@@ -103,7 +103,7 @@ export function StockPlanning({
         <label className="field">
           Product / SKU
           <select value={product} onChange={(e) => setProduct(e.target.value)}>
-            <option value="">All Ocean Pride Longyi styles</option>
+            <option value="">All Oceanpride Longyi styles</option>
             {products.map((r) => (
               <option value={r.productId} key={r.productId}>
                 {r.productName} · {r.variant}

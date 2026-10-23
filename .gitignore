@@ -1,6 +1,7 @@
 node_modules/
 .next/
 .next-demo/
+.next-video/
 .next-group-routing/
 .next-stock-planning/
 .next-stock-planning-review/

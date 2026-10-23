@@ -466,8 +466,8 @@ export function BranchDetail({
             >
               <p className="muted">
                 {direction === "return"
-                  ? `${branch.name} → Ocean Pride Longyi HQ`
-                  : `Ocean Pride Longyi HQ → ${branch.name}`}
+                  ? `${branch.name} → Oceanpride Longyi HQ`
+                  : `Oceanpride Longyi HQ → ${branch.name}`}
               </p>
               <label className="field">
                 Stock movement

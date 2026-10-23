@@ -1,0 +1,16 @@
+{
+  "orderId": "09f0f217-8990-4e11-8726-287b691add4a",
+  "status": "Done",
+  "matchingSales": [
+    {
+      "id": "adc2f3df-1045-46a6-92b8-e01872c67bbd",
+      "date": "2026-10-23",
+      "units": 60,
+      "amount": 2700000,
+      "channel": "Wholesale",
+      "orderId": "09f0f217-8990-4e11-8726-287b691add4a",
+      "branchId": null,
+      "reference": "OPL-09F0F217-8990-4E11-8726-287B691ADD4A"
+    }
+  ]
+}

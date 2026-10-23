@@ -19,7 +19,7 @@ const input = {
   pin: { latitude: 16.84, longitude: 96.17 },
 };
 describe("HQ-issued portal credentials", () => {
-  it("uses the imported Ocean Pride Longyi styles as the active catalog", () => {
+  it("uses the imported Oceanpride Longyi styles as the active catalog", () => {
     expect(new Set(demoData.products.map((p) => p.name)).size).toBe(1);
     expect(
       demoData.products.every(

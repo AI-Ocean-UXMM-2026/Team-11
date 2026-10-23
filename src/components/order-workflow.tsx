@@ -108,6 +108,8 @@ export function OrderWorkflow({
   const [consignmentResolved, setConsignmentResolved] = useState(false);
   useEffect(() => setDriver(w?.driverId ?? ""), [w?.driverId]);
   if (!w) return <p>Refresh this order to load its workflow.</p>;
+  const unit = variantUnit(w.lines[0]?.variant ?? "");
+  const units = `${unit}s`;
   const hq = viewer.role === "hq",
     sme = viewer.role === "sme",
     isDriver = viewer.role === "driver";
@@ -181,7 +183,7 @@ export function OrderWorkflow({
                 receivedOrder?.status === "Done"
                   ? "Your order is complete."
                   : receivedOrder?.workflow?.fulfilment?.remaining
-                    ? `${receivedOrder.workflow.fulfilment.remaining} pairs remaining.`
+                    ? `${receivedOrder.workflow.fulfilment.remaining} ${units} remaining.`
                     : "Awaiting driver handover."
               }`,
             );
@@ -245,7 +247,7 @@ export function OrderWorkflow({
     <div className="modal-form workflow-detail" aria-busy={pending}>
       <div className="workflow-heading">
         <div>
-          <span className="eyebrow">OCEAN PRIDE LONGYI WHOLESALE</span>
+          <span className="eyebrow">Oceanpride LONGYI WHOLESALE</span>
           <h3>{sme ? "Order status" : order.business}</h3>
           {!sme && <p className="muted">{order.location}</p>}
         </div>
@@ -542,8 +544,8 @@ export function OrderWorkflow({
               <p>
                 Accepting reserves{" "}
                 {w.fulfilment?.current
-                  ? `only the ${w.fulfilment.current.pairs} pairs in phase ${w.fulfilment.current.number}`
-                  : "every ordered pair"}{" "}
+                  ? `only the ${w.fulfilment.current.pairs} ${units} in phase ${w.fulfilment.current.number}`
+                  : `every ordered ${unit}`}{" "}
                 from dedicated wholesale backup stock. Retail stock stays
                 separate. Assign one of your branch drivers after acceptance.
               </p>
@@ -555,7 +557,7 @@ export function OrderWorkflow({
                 }
               >
                 {w.fulfilment?.current
-                  ? `Accept & reserve ${w.fulfilment.current.pairs} pairs`
+                  ? `Accept & reserve ${w.fulfilment.current.pairs} ${units}`
                   : "Accept & reserve branch stock"}
               </button>
               <label className="field">
@@ -665,7 +667,7 @@ export function OrderWorkflow({
                     )
                     .map((b) => (
                       <option value={b.id} key={b.id}>
-                        {b.name} · {b.stock} pairs on hand
+                        {b.name} · {b.stock} {units} on hand
                       </option>
                     ))}
                 </select>
@@ -699,7 +701,7 @@ export function OrderWorkflow({
                       onChange={(e) => setOriginalResolution(e.target.value)}
                     >
                       <option value="returned_to_hq">
-                        All original pairs physically returned to HQ
+                        All original {units} physically returned to HQ
                       </option>
                       <option value="lost">
                         Original consignment confirmed lost — restore no stock
@@ -714,7 +716,7 @@ export function OrderWorkflow({
                     />
                     I confirm the original consignment is resolved
                     {originalResolution === "returned_to_hq"
-                      ? " and every pair was physically received back at HQ"
+                      ? ` and every ${unit} was physically received back at HQ`
                       : ""}
                     .
                   </label>
@@ -814,7 +816,7 @@ export function OrderWorkflow({
                     disabled={pending || !w.driverId}
                     onClick={() => act("dispatch")}
                   >
-                    Dispatch reserved pairs
+                    Dispatch reserved {units}
                   </button>
                 )}
                 {isDriver &&
@@ -872,8 +874,8 @@ export function OrderWorkflow({
                         onChange={(e) => setFullReceipt(e.target.checked)}
                       />
                       {w.fulfilment?.current
-                        ? `I received all ${w.fulfilment.current.pairs} pairs in phase ${w.fulfilment.current.number}.`
-                        : "I received every ordered pair, in full."}
+                        ? `I received all ${w.fulfilment.current.pairs} ${units} in phase ${w.fulfilment.current.number}.`
+                        : `I received every ordered ${unit}, in full.`}
                     </label>
                     <button
                       className="button primary"

@@ -1,0 +1,146 @@
+[
+  {
+    "role": "hq",
+    "label": "overview",
+    "start": 13.717,
+    "duration": 7
+  },
+  {
+    "role": "hq",
+    "label": "branches",
+    "start": 21.815,
+    "duration": 7
+  },
+  {
+    "role": "sme",
+    "label": "catalog",
+    "start": 1.072,
+    "duration": 7
+  },
+  {
+    "role": "sme",
+    "label": "cart",
+    "start": 8.086,
+    "duration": 6
+  },
+  {
+    "role": "sme",
+    "label": "checkout",
+    "start": 14.088,
+    "duration": 6
+  },
+  {
+    "role": "sme",
+    "label": "review",
+    "start": 81.339,
+    "duration": 6
+  },
+  {
+    "role": "sme",
+    "label": "payment",
+    "start": 87.347,
+    "duration": 7
+  },
+  {
+    "role": "sme",
+    "label": "submitted",
+    "start": 178.241,
+    "duration": 6
+  },
+  {
+    "role": "hq",
+    "label": "verified",
+    "start": 379.364,
+    "duration": 7
+  },
+  {
+    "role": "hq",
+    "label": "dispatch",
+    "start": 465.166,
+    "duration": 7
+  },
+  {
+    "role": "driver",
+    "label": "driver",
+    "start": 0.288,
+    "duration": 8
+  },
+  {
+    "role": "sme",
+    "label": "tracking",
+    "start": 367.258,
+    "duration": 7
+  },
+  {
+    "role": "hq",
+    "label": "hold",
+    "start": 515.068,
+    "duration": 7
+  },
+  {
+    "role": "hq",
+    "label": "recovery",
+    "start": 553.819,
+    "duration": 8
+  },
+  {
+    "role": "branch",
+    "label": "branch_accept",
+    "start": 162.423,
+    "duration": 7
+  },
+  {
+    "role": "branch",
+    "label": "branch_stock",
+    "start": 169.532,
+    "duration": 6
+  },
+  {
+    "role": "sme",
+    "label": "remaining",
+    "start": 586.313,
+    "duration": 8
+  },
+  {
+    "role": "sme",
+    "label": "phase_two",
+    "start": 596.584,
+    "duration": 8
+  },
+  {
+    "role": "sme",
+    "label": "received",
+    "start": 626.081,
+    "duration": 7
+  },
+  {
+    "role": "sme",
+    "label": "done",
+    "start": 633.175,
+    "duration": 8
+  },
+  {
+    "role": "hq",
+    "label": "planning",
+    "start": 885.773,
+    "duration": 6
+  },
+  {
+    "role": "hq",
+    "label": "refill",
+    "start": 927.712,
+    "duration": 7
+  },
+  {
+    "role": "hq",
+    "label": "plan_drawer",
+    "start": 968.573,
+    "duration": 7
+  },
+  {
+    "role": "hq",
+    "label": "reports",
+    "start": 975.698,
+    "duration": 8
+  }
+]

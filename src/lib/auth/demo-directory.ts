@@ -38,7 +38,7 @@ export class DemoDirectory {
         username: "hq.admin",
         role: "hq",
         status: "Active",
-        affiliation: "Ocean Pride Longyi HQ",
+        affiliation: "Oceanpride Longyi HQ",
       },
       ...demoData.accounts.map((a, i) => ({
         ...a,

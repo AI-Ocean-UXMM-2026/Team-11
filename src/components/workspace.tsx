@@ -104,7 +104,7 @@ const navigations: Record<Role, Nav[]> = {
   ],
   sme: [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
-    { key: "catalog", label: "Ocean Pride catalog", icon: ShoppingBag },
+    { key: "catalog", label: "Oceanpride catalog", icon: ShoppingBag },
     { key: "orders", label: "My orders", icon: ClipboardList },
     { key: "locations", label: "Supplier locations", icon: MapPin },
   ],
@@ -132,7 +132,7 @@ const sectionTitles: Record<string, string> = {
   "stock-planning": "Stock Planning",
   "stock-movements": "Manage Stock Movement",
   settings: "Workspace settings",
-  catalog: "Ocean Pride product catalog",
+  catalog: "Oceanpride product catalog",
   locations: "Supplier locations",
   sales: "Retail sales",
   deliveries: "Your deliveries",
@@ -915,7 +915,7 @@ export function Workspace({
           <div>
             <strong>
               {role === "hq"
-                ? "Ocean Pride Longyi"
+                ? "Oceanpride Longyi"
                 : role === "sme"
                   ? viewer.name
                   : role === "branch"
@@ -1079,7 +1079,7 @@ export function Workspace({
                     {role === "hq"
                       ? "A little clarity for everything moving in your business."
                       : role === "sme"
-                        ? "Your Ocean Pride Longyi orders and deliveries in one place."
+                        ? "Your Oceanpride Longyi orders and deliveries in one place."
                         : role === "branch"
                           ? "Keep retail moving and your wholesale reserve ready."
                           : "Your assigned deliveries and the details you need."}
@@ -1333,7 +1333,7 @@ export function Workspace({
                         ? "Bring your sales, stock and backup fulfilment together."
                         : role === "driver"
                           ? "Keep the shops that depend on you in the loop."
-                          : "Ocean Pride Longyi wholesale products from the supplier you trust, all in one place."}
+                          : "Oceanpride Longyi wholesale products from the supplier you trust, all in one place."}
                   </p>
                   <Link
                     href={href(
@@ -1437,7 +1437,7 @@ export function Workspace({
                             new Set(data.products.map((p) => p.name)).size,
                           ),
                           unit: "model",
-                          note: "Ocean Pride wholesale catalog",
+                          note: "Oceanpride wholesale catalog",
                           icon: Package,
                           detail: "In the catalog",
                         },
@@ -1877,7 +1877,7 @@ export function Workspace({
               </div>
               <div className="supplier-catalog-note">
                 <ShieldCheck size={17} />
-                <strong>Ocean Pride wholesale catalog</strong>
+                <strong>Oceanpride wholesale catalog</strong>
                 <span>Browse available products and styles</span>
               </div>
               {section === "catalog" && data.settings?.shipping == null && (
@@ -2496,7 +2496,7 @@ export function Workspace({
               <span className="footer-logo">
                 <Boxes size={14} />
               </span>
-              Ocean Pride Longyi. Stronger connections.
+              Oceanpride Longyi. Stronger connections.
             </span>
             <span>
               {demo ? "Local demo · Saved workflow" : "SupplyLink workspace"}
@@ -2587,7 +2587,7 @@ export function Workspace({
                     <option value="">
                       {accountRole === "branch"
                         ? "Choose an open branch"
-                        : "Ocean Pride Longyi HQ"}
+                        : "Oceanpride Longyi HQ"}
                     </option>
                     {data.branches
                       .filter((b) => b.active !== false)

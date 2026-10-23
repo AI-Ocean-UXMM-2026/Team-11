@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { Branch, Order, Viewer } from "@/lib/domain";
 import { metresBetween } from "@/lib/routing";
+import { variantUnit } from "@/lib/checkout";
 
 export function PhasedFulfilment({
   order,
@@ -17,6 +18,8 @@ export function PhasedFulfilment({
   act: (action: string, payload?: Record<string, unknown>) => void;
 }) {
   const w = order.workflow!;
+  const unit = variantUnit(w.lines[0]?.variant ?? "");
+  const units = `${unit}s`;
   const progress = w.fulfilment;
   const current = progress?.current;
   const [source, setSource] = useState("");
@@ -111,8 +114,8 @@ export function PhasedFulfilment({
         ) === line.remaining,
     );
   const defaultPhaseReason = canDeliverInOneTrip
-    ? `Full delivery planned from ${selectedSource === "hq" ? "HQ" : (sourceBranch?.name ?? "the selected branch")} for ${phaseQuantity} pairs.`
-    : `${selectedSource === "hq" ? "HQ" : (sourceBranch?.name ?? "The selected branch")} phase planned for ${phaseQuantity} pairs.`;
+    ? `Full delivery planned from ${selectedSource === "hq" ? "HQ" : (sourceBranch?.name ?? "the selected branch")} for ${phaseQuantity} ${units}.`
+    : `${selectedSource === "hq" ? "HQ" : (sourceBranch?.name ?? "The selected branch")} phase planned for ${phaseQuantity} ${units}.`;
   const valid =
     selected.length > 0 &&
     outstanding.every((l) => {
@@ -163,24 +166,26 @@ export function PhasedFulfilment({
             <div>
               <dt>Received</dt>
               <dd>
-                {progress.received} of {progress.ordered} pairs
+                {progress.received} of {progress.ordered} {units}
               </dd>
             </div>
             <div>
               <dt>Remaining</dt>
-              <dd>{progress.remaining} pairs</dd>
+              <dd>
+                {progress.remaining} {units}
+              </dd>
             </div>
           </dl>
           {order.status === "Order remaining" && (
             <p className="inline-note">
               Order remaining. Each phase keeps its own delivery status. Done
-              requires receipt and driver handover for every pair.
+              requires receipt and driver handover for every {unit}.
             </p>
           )}
           {current && (
             <div className="phase-current">
               <strong>
-                Phase {current.number} · {current.pairs} pairs
+                Phase {current.number} · {current.pairs} {units}
               </strong>
               <p>
                 {current.source} ·{" "}
@@ -191,7 +196,8 @@ export function PhasedFulfilment({
               <ul>
                 {current.lines.map((l) => (
                   <li key={l.productId}>
-                    {l.name} · {l.variant} · {l.quantity} pairs
+                    {l.name} · {l.variant} · {l.quantity}{" "}
+                    {variantUnit(l.variant)}s
                   </li>
                 ))}
               </ul>
@@ -209,7 +215,7 @@ export function PhasedFulfilment({
               {progress.history.map((p) => (
                 <li key={p.id}>
                   <strong>
-                    Phase {p.number} · {p.pairs} pairs · {p.source}
+                    Phase {p.number} · {p.pairs} {units} · {p.source}
                   </strong>
                   <small>
                     {p.state === "received"
@@ -228,7 +234,7 @@ export function PhasedFulfilment({
         <details open={!!progress} className="phase-plan">
           <summary>
             Plan phase {phaseNumber}
-            {progress ? ` · ${progress.remaining} pairs outstanding` : ""}
+            {progress ? ` · ${progress.remaining} ${units} outstanding` : ""}
           </summary>
           <label className="field">
             Fulfilment source
@@ -240,7 +246,7 @@ export function PhasedFulfilment({
                 setQuantities({});
               }}
             >
-              <option value="hq">Ocean Pride Longyi HQ</option>
+              <option value="hq">Oceanpride Longyi HQ</option>
               {activeBranches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
@@ -254,7 +260,7 @@ export function PhasedFulfilment({
                 <strong>
                   {canDeliverInOneTrip
                     ? "Full delivery"
-                    : `Phased delivery · ${phaseQuantity} pairs`}
+                    : `Phased delivery · ${phaseQuantity} ${units}`}
                 </strong>
               </div>
               <div className="phase-quantity-list">
@@ -276,10 +282,10 @@ export function PhasedFulfilment({
                       </span>
                       <span>
                         <span className="sr-only">
-                          Phase pairs for {l.variant}
+                          Phase {variantUnit(l.variant)}s for {l.variant}
                         </span>
                         <input
-                          aria-label={`Phase pairs for ${l.variant}`}
+                          aria-label={`Phase ${variantUnit(l.variant)}s for ${l.variant}`}
                           type="number"
                           min="0"
                           max={max}
@@ -310,8 +316,8 @@ export function PhasedFulfilment({
                   setReturnedConsignmentConfirmed(event.target.checked)
                 }
               />
-              I confirm all originally dispatched pairs were physically returned
-              to HQ.
+              I confirm all originally dispatched {units} were physically
+              returned to HQ.
             </label>
           )}
           <label className="field">
@@ -325,7 +331,7 @@ export function PhasedFulfilment({
             />
           </label>
           <p className="muted">
-            {phaseQuantity} pairs in{" "}
+            {phaseQuantity} {units} in{" "}
             {canDeliverInOneTrip ? "full delivery" : `phase ${phaseNumber}`}
           </p>
           <button
@@ -348,10 +354,10 @@ export function PhasedFulfilment({
             {selectedSource === "hq"
               ? canDeliverInOneTrip
                 ? "Reserve full delivery at HQ"
-                : `Reserve HQ phase · ${phaseQuantity} pairs`
+                : `Reserve HQ phase · ${phaseQuantity} ${units}`
               : canDeliverInOneTrip
                 ? "Request full branch delivery"
-                : `Request branch phase · ${phaseQuantity} pairs`}
+                : `Request branch phase · ${phaseQuantity} ${units}`}
           </button>
         </details>
       )}

@@ -16,7 +16,7 @@ function assignedLocation(driver: Account, data: WorkspaceData) {
     ? (data.branches.find((branch) => branch.id === driver.branchId)?.name ??
         driver.branchName ??
         driver.affiliation)
-    : "Ocean Pride Longyi HQ";
+    : "Oceanpride Longyi HQ";
 }
 
 export function DriverManagement({ data, updated }: Props) {
@@ -66,7 +66,7 @@ export function DriverManagement({ data, updated }: Props) {
               aria-label="Filter drivers by branch"
             >
               <option value="">All branches</option>
-              <option value="__hq__">Ocean Pride Longyi HQ</option>
+              <option value="__hq__">Oceanpride Longyi HQ</option>
               {data.branches.map((branch) => (
                 <option key={branch.id} value={branch.id}>
                   {branch.name}
@@ -235,7 +235,7 @@ function DriverAffiliation({
             disabled={pending}
             onChange={(event) => setBranchId(event.target.value)}
           >
-            <option value="">Ocean Pride Longyi HQ</option>
+            <option value="">Oceanpride Longyi HQ</option>
             {closedBranch && (
               <option value={driver.branchId!} disabled>
                 {assignedLocation(driver, data)} (closed)
