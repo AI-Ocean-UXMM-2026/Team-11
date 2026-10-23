@@ -21,6 +21,8 @@ A supplier management and wholesale ordering platform connecting SMEs with a sup
 
 Run `npm install`, copy `.env.example` to `.env.local`, then run `npm run dev` and open http://127.0.0.1:3000. Demo mode works without credentials. See [implementation and routes](docs/implementation.md), [Supabase setup](docs/supabase-setup.md), and [design references](docs/design.md). Use `npm test`, `npm run typecheck`, and `npm run build` to validate the baseline.
 
+Production deployment uses GitHub Actions and Vercel. Add `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as GitHub Actions secrets, configure production app variables in Vercel, and push to `main`. See [Vercel deployment setup](docs/vercel-deployment.md).
+
 The connected workflow now includes saved STT quotes, private payment evidence, HQ review, atomic stock reservation, driver assignment/dispatch/handover, SME receipt, HQ completion, protected retail posting and sales-event reports. Local demo data persists in a private Postgres directory. The local app now connects to the hosted **Supply Link** Supabase project. See [live setup and first HQ login](docs/live-supabase.md). See [phase 2 walkthrough and API](docs/order-workflow.md). [Branch operations](docs/branch-operations.md) and [pickup-triggered foreground tracking](docs/driver-tracking.md) are implemented. Background GPS, returns/refund accounting and account lifecycle controls remain future work.
 
 ## Overview
